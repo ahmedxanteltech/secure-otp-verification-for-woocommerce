@@ -2,7 +2,7 @@
 
 **Stop fake accounts, account-sharing logins, and fraudulent orders — verify every customer's email with a one-time code, right inside WooCommerce.**
 
-[![WordPress Plugin Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/xanteltechnologies/secure-otp-verification-for-woocommerce/releases)
+[![WordPress Plugin Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
 [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 [![WordPress](https://img.shields.io/badge/WordPress-5.6%2B-blue.svg)](https://wordpress.org)
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-required-96588a.svg)](https://woocommerce.com)
@@ -47,7 +47,7 @@ Fake registrations, throwaway emails, and typo'd addresses at checkout quietly c
 4. Go to **Settings → Secure OTP** to configure
 
 ### Manual installation
-1. Download the latest release from the [Releases page](https://github.com/xanteltechnologies/secure-otp-verification-for-woocommerce/releases)
+1. Download the latest release from the [Releases page](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
 2. In your WordPress admin, go to **Plugins → Add New → Upload Plugin**
 3. Upload the `.zip` file and click **Install Now**, then **Activate**
 4. Go to **Settings → Secure OTP** to configure
@@ -116,7 +116,7 @@ Version 1.0.1 included a security hardening pass: OTP verification is checked se
 
 ## Support
 
-- 🐛 Found a bug? [Open an issue](https://github.com/xanteltechnologies/secure-otp-verification-for-woocommerce/issues)
+- 🐛 Found a bug? [Open an issue](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/issues)
 - 💬 Questions or feature requests: **support@xanteltech.com**
 - 🌐 More about Xantel Technologies: [xanteltech.com](https://xanteltech.com)
 
