@@ -1,0 +1,90 @@
+/* Xantel Email OTP — Styles */
+
+.xeo-otp-timer {
+    display: block;
+    font-size: 13px;
+    color: #e74c3c;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+.xeo-resend-otp {
+    font-size: 13px;
+    color: #1a1a2e;
+    text-decoration: underline;
+    cursor: pointer;
+    display: inline-block;
+    margin-top: 5px;
+}
+
+/* Send OTP button */
+.xeo-send-otp-btn {
+    background: #1a1a2e !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.2s !important;
+}
+.xeo-send-otp-btn:hover {
+    background: #2d2d4e !important;
+}
+
+/* Verify button (checkout) */
+#xeo-checkout-verify-otp {
+    background: #27ae60 !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+#xeo-checkout-verify-otp:hover {
+    background: #219a52 !important;
+}
+
+/* OTP input */
+#xeo_checkout_otp,
+#xeo_otp_login_code {
+    font-size: 20px !important;
+    letter-spacing: 8px !important;
+    text-align: center !important;
+}
+
+/* Checkout wrapper */
+.xeo-checkout-otp-wrapper {
+    border: 2px solid #1a1a2e !important;
+    border-radius: 8px !important;
+    margin-bottom: 20px !important;
+}
+
+/* Verified msg */
+#xeo-checkout-verified-msg {
+    font-size: 16px;
+    padding: 10px;
+    background: #eafaf1;
+    border-radius: 4px;
+    border: 1px solid #27ae60;
+}
+
+/* Login tabs */
+.xeo-login-tabs {
+    margin-bottom: 20px !important;
+}
+
+/* OTP-only login form */
+#xeo-otp-only-login {
+    animation: xeoFadeIn 0.3s ease;
+}
+
+@keyframes xeoFadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Users column */
+.column-xeo_email_verified {
+    width: 130px !important;
+}

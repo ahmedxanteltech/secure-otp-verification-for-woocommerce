@@ -1,0 +1,20 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Packaged zips (built artifacts, not source)
+*.zip
+
+# Local env files, if you ever add tooling later
+.env
+node_modules/
+vendor/
