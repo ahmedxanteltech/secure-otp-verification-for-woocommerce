@@ -18,6 +18,10 @@ class XEO_Admin {
         register_setting('xeo_settings', 'xeo_disable_password_login', ['sanitize_callback' => 'absint']);
         register_setting('xeo_settings', 'xeo_skip_checkout_logged_in', ['sanitize_callback' => 'absint']);
         register_setting('xeo_settings', 'xeo_trusted_device_days', ['sanitize_callback' => 'absint']);
+        register_setting('xeo_settings', 'xeo_delete_data_on_uninstall', ['sanitize_callback' => 'absint']);
+        register_setting('xeo_settings', 'xeo_checkout_mode', ['sanitize_callback' => function ($v) {
+            return $v === 'flag' ? 'flag' : 'block';
+        }]);
     }
 
     public function password_disabled_notice() {
@@ -43,6 +47,8 @@ class XEO_Admin {
         $password_disabled = xeo_password_login_disabled();
         $skip_checkout     = xeo_skip_checkout_for_logged_in();
         $trusted_days      = xeo_trusted_device_days();
+        $delete_on_uninstall = (bool) get_option('xeo_delete_data_on_uninstall', 0);
+        $checkout_mode        = xeo_checkout_mode();
 
         $modes = [
             'register_only'           => 'Registration Only',
@@ -113,6 +119,19 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
+                            <th><label for="xeo_checkout_mode">Checkout OTP Behavior</label></th>
+                            <td>
+                                <select name="xeo_checkout_mode" id="xeo_checkout_mode" style="min-width:320px;padding:8px;">
+                                    <option value="block" <?php selected($checkout_mode,'block'); ?>>Require OTP before placing order</option>
+                                    <option value="flag" <?php selected($checkout_mode,'flag'); ?>>Flag unverified orders for review (don't block checkout)</option>
+                                </select>
+                                <p class="description">
+                                    <strong>Require OTP:</strong> the order can't be placed until the billing email is verified. Strictest, but checkout stops working entirely if OTP emails can't be delivered (e.g. an SMTP outage).<br>
+                                    <strong>Flag for review:</strong> checkout is never blocked. Every order gets an "Email Verified: Yes/No" marker on the Orders list and order screen, based on whether the billing email (or the logged-in account) has a verified email on file — you decide whether to follow up on unverified ones.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
                             <th><label for="xeo_skip_checkout_logged_in">Skip Checkout OTP for Logged-In Customers</label></th>
                             <td>
                                 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
@@ -121,6 +140,7 @@ class XEO_Admin {
                                     <span style="font-weight:500;">Don't ask for checkout OTP if the customer is already logged in</span>
                                 </label>
                                 <p class="description">
+                                    Only applies when Checkout OTP Behavior above is set to "Require OTP" — in "Flag for review" mode, checkout never shows an OTP field for anyone.
                                     Guest checkouts always require OTP. Logged-in customers already proved their account at registration/login,
                                     so this avoids asking twice. Turn off to always require a fresh OTP at checkout, even for logged-in customers.
                                 </p>
@@ -134,6 +154,20 @@ class XEO_Admin {
                                 <p class="description">
                                     After a successful login OTP, this device won't be asked for OTP again for this many days
                                     (resets the clock each time it's used). Set lower for tighter security, higher for less friction.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="xeo_delete_data_on_uninstall">On Plugin Deletion</label></th>
+                            <td>
+                                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                    <input type="checkbox" name="xeo_delete_data_on_uninstall" id="xeo_delete_data_on_uninstall"
+                                        value="1" <?php checked($delete_on_uninstall,1); ?> style="width:18px;height:18px;" />
+                                    <span style="font-weight:500;">Delete all plugin data (OTP logs, verified-user records, trusted devices, and these settings) when the plugin is deleted</span>
+                                </label>
+                                <p class="description">
+                                    <strong>Unchecked (default, recommended):</strong> deactivating or deleting this plugin leaves your data untouched, so reinstalling later picks up right where you left off — no re-verifying every customer.<br>
+                                    <strong>Checked:</strong> clicking "Delete" in Plugins will permanently drop the plugin's database tables and settings. This cannot be undone.
                                 </p>
                             </td>
                         </tr>

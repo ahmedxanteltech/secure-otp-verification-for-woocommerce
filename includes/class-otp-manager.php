@@ -60,6 +60,8 @@ class XEO_OTP_Manager {
         ));
     }
 
+    public static $last_mail_error = null;
+
     public static function send_email($email, $otp, $purpose) {
         $site_name = get_bloginfo('name');
         $subject   = sprintf('[%s] Your OTP Code — %s', $site_name, ucfirst($purpose));
@@ -93,7 +95,15 @@ class XEO_OTP_Manager {
             </div>
         </body></html>';
 
-        return wp_mail($email, $subject, $message, ['Content-Type: text/html; charset=UTF-8']);
+        self::$last_mail_error = null;
+        $capture = function ($wp_error) {
+            if (is_wp_error($wp_error)) self::$last_mail_error = $wp_error->get_error_message();
+        };
+        add_action('wp_mail_failed', $capture);
+        $sent = wp_mail($email, $subject, $message, ['Content-Type: text/html; charset=UTF-8']);
+        remove_action('wp_mail_failed', $capture);
+
+        return $sent;
     }
 
     public static function cleanup() {

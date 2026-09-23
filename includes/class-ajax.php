@@ -44,8 +44,15 @@ class XEO_Ajax {
         $otp  = XEO_OTP_Manager::generate($email, $purpose);
         $sent = XEO_OTP_Manager::send_email($email, $otp, $purpose);
 
-        if ($sent) wp_send_json_success(['message' => 'OTP sent to ' . $email . '. Valid for 2 minutes.', 'email' => $email]);
-        else       wp_send_json_error(['message' => 'Failed to send OTP. Please check your SMTP settings.']);
+        if ($sent) {
+            wp_send_json_success(['message' => 'OTP sent to ' . $email . '. Valid for 2 minutes.', 'email' => $email]);
+        } else {
+            $message = 'Failed to send OTP. Please check your SMTP settings.';
+            if (current_user_can('manage_options') && XEO_OTP_Manager::$last_mail_error) {
+                $message .= ' [Admin diagnostic: ' . XEO_OTP_Manager::$last_mail_error . ']';
+            }
+            wp_send_json_error(['message' => $message]);
+        }
     }
 
     public function verify_otp() {

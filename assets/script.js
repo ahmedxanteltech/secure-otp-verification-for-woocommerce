@@ -27,14 +27,42 @@ jQuery(function ($) {
 
     function style(sel, css) { $(sel).css(css); }
 
+    // Many WooCommerce themes replace the default account/checkout markup
+    // with their own popup or block-based forms, and don't always keep
+    // WooCommerce's default field ids (#reg_email, #billing_email, #username).
+    // WooCommerce core itself relies on the field NAME to process
+    // registration/checkout/login, so virtually every theme keeps those —
+    // fall back to name-based lookup within the same form when the id we
+    // expected isn't on the page.
+    function resolveField(btn, selector) {
+        var $field = selector ? $(selector) : $();
+        if ($field.length) return $field;
+
+        var $form = btn.closest('form');
+        if (!$form.length) return $field;
+
+        var purpose = btn.data('purpose');
+        var candidates;
+        if (purpose === 'registration') {
+            candidates = 'input[name="email"], input[type="email"]';
+        } else if (purpose === 'checkout') {
+            candidates = 'input[name="billing_email"], input[type="email"]';
+        } else if (purpose === 'login') {
+            candidates = 'input[name="username"], input[name="log"], input[type="email"]';
+        } else {
+            candidates = 'input[type="email"]';
+        }
+        return $form.find(candidates).first();
+    }
+
     // ── Send OTP ─────────────────────────────────────────────────────────────
     $(document).on('click', '.xeo-send-otp-btn', function (e) {
         e.preventDefault();
         var btn        = $(this);
         var purpose    = btn.data('purpose');
-        var emailField = btn.data('email-field');
         var showInput  = btn.data('show-input');
-        var email      = $(emailField).val().trim();
+        var $field     = resolveField(btn, btn.data('email-field'));
+        var email      = ($field.val() || '').trim();
 
         if (!email) { xeoShowMsg(purpose, xeo_ajax.messages.enter_email, 'error'); return; }
 
@@ -81,7 +109,8 @@ jQuery(function ($) {
     $(document).on('click', '#xeo-checkout-verify-otp', function (e) {
         e.preventDefault();
         var btn   = $(this);
-        var email = $('#billing_email').val();
+        var $field = resolveField(btn, btn.data('email-field'));
+        var email = ($field.val() || '').trim();
         var otp   = $('#xeo_checkout_otp').val();
 
         if (!otp || otp.length !== 6) { xeoShowMsg('checkout', 'Please enter a valid 6-digit OTP.', 'error'); return; }
@@ -112,8 +141,8 @@ jQuery(function ($) {
         e.preventDefault();
         var link       = $(this);
         var purpose    = link.data('purpose');
-        var emailField = link.data('email-field') || '#billing_email';
-        var email      = $(emailField).val().trim();
+        var $field     = resolveField(link, link.data('email-field'));
+        var email      = ($field.val() || '').trim();
 
         link.hide();
         stopTimer(purpose);

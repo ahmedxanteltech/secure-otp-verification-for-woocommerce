@@ -3,7 +3,7 @@
  * Plugin Name: Secure OTP Verification for WooCommerce
  * Plugin URI: https://xanteltech.com
  * Description: Secure email OTP verification for WooCommerce — Registration, Login and Checkout.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Xantel Technologies
  * Author URI: https://xanteltech.com
  * Text Domain: secure-otp-verification-for-woocommerce
@@ -13,7 +13,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('XEO_VERSION',    '1.1.0');
+define('XEO_VERSION',    '1.2.0');
 define('XEO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('XEO_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('XEO_OTP_EXPIRY', 120); // 2 minutes
@@ -24,12 +24,25 @@ require_once XEO_PLUGIN_DIR . 'includes/class-trusted-device.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-registration.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-login.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-checkout.php';
+require_once XEO_PLUGIN_DIR . 'includes/class-order-column.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-ajax.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-admin.php';
 require_once XEO_PLUGIN_DIR . 'includes/class-users-column.php';
 
-// Activation — create DB tables
-register_activation_hook(__FILE__, 'xeo_create_tables');
+// Activation — refuse cleanly if WooCommerce isn't active, then create DB tables
+register_activation_hook(__FILE__, 'xeo_activate');
+function xeo_activate() {
+    if (!class_exists('WooCommerce') && !in_array('woocommerce/woocommerce.php', (array) get_option('active_plugins', []), true)) {
+        deactivate_plugins(plugin_basename(__FILE__));
+        wp_die(
+            'Secure OTP Verification for WooCommerce requires WooCommerce to be installed and active. Please activate WooCommerce first, then activate this plugin again.',
+            'Plugin Activation Error',
+            ['back_link' => true]
+        );
+    }
+    xeo_create_tables();
+}
+
 function xeo_create_tables() {
     global $wpdb;
     $charset = $wpdb->get_charset_collate();
@@ -99,14 +112,40 @@ function xeo_trusted_device_days() {
     return $days > 0 ? $days : 30;
 }
 
-// Bootstrap
+function xeo_checkout_mode() {
+    $mode = get_option('xeo_checkout_mode', 'block');
+    return $mode === 'flag' ? 'flag' : 'block';
+}
+
+// Bootstrap — only runs if WooCommerce is actually active. If WooCommerce
+// gets deactivated for any reason (conflict, bad update, admin error), this
+// plugin must fail safe (do nothing + tell the admin) rather than fatal-error
+// the whole site by calling WooCommerce functions that no longer exist.
 add_action('plugins_loaded', function () {
+    if (!class_exists('WooCommerce')) {
+        add_action('admin_notices', function () {
+            echo '<div class="notice notice-error"><p><strong>Secure OTP Verification for WooCommerce</strong> is inactive because WooCommerce is not active. OTP verification is currently NOT being enforced on registration, login, or checkout. Please reactivate WooCommerce.</p></div>';
+        });
+        return;
+    }
+
     new XEO_Registration();
     new XEO_Login();
     new XEO_Checkout();
+    new XEO_Order_Column();
     new XEO_Ajax();
     new XEO_Admin();
     new XEO_Users_Column();
+}, 20); // priority 20: run after WooCommerce's own plugins_loaded init (priority 10)
+
+// Declare compatibility with WooCommerce's High-Performance Order Storage
+// (HPOS). This plugin never reads/writes order data directly — it only
+// hooks the checkout process to require OTP before an order is placed — so
+// it has nothing that depends on the legacy post-based order storage.
+add_action('before_woocommerce_init', function () {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+    }
 });
 
 // Front-end assets

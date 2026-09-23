@@ -2,7 +2,7 @@
 
 **Stop fake accounts, account-sharing logins, and fraudulent orders — verify every customer's email with a one-time code, right inside WooCommerce.**
 
-[![WordPress Plugin Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
+[![WordPress Plugin Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
 [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 [![WordPress](https://img.shields.io/badge/WordPress-5.6%2B-blue.svg)](https://wordpress.org)
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-required-96588a.svg)](https://woocommerce.com)
@@ -30,6 +30,7 @@ Fake registrations, throwaway emails, and typo'd addresses at checkout quietly c
 - ✅ **Email OTP at Login** — optional OTP-based login, alongside or instead of passwords
 - ✅ **Email OTP at Checkout** — verify the billing email before an order is placed for guest checkout; logged-in customers skip it automatically (togglable)
 - ✅ **Trusted-device login for password sign-in** — a device that already passed password + OTP isn't asked again for an admin-configurable number of days (the password-less OTP-only tab always requires a fresh code)
+- ✅ **Checkout OTP Behavior** — require OTP before placing an order, or flag unverified orders for admin review instead of blocking checkout, with an Email Verified column on the Orders list
 - ✅ **Force OTP-only login** — disable password login for all non-admin users store-wide
 - ✅ **Per-store configuration** — turn OTP on for registration only, registration + login, or all three
 - ✅ **Admin dashboard** — OTPs sent, verified, and blocked, at a glance, with a recent-activity log
@@ -82,6 +83,9 @@ Yes, by default. Logged-in customers already proved their account at registratio
 **Do customers have to enter an OTP every time they log in?**
 Not when logging in with a password. After a successful password + OTP login, that device is remembered for an admin-configurable number of days (Settings → Secure OTP, default 30) — each use extends the window; a new device, a cleared cookie, or an expired window still requires OTP. This applies to password-based login only — the password-less "Login with OTP" tab always requires a fresh OTP, since without a password there's nothing else confirming identity. You can force re-verification for a specific customer via Users → Bulk Actions → "Forget Trusted Login Devices."
 
+**Does this work with Elementor, Divi, or other page builders?**
+Yes, when the builder is used to style or lay out a page around WooCommerce's own registration, login, or checkout form (its own shortcodes/blocks) — this is the vast majority of page-builder usage, and the plugin's field detection adapts to custom markup automatically. It does not currently integrate with separate custom-form tools that replace WooCommerce's own forms entirely — for example Elementor Pro's own Login widget, Gravity Forms' or WPForms' user-registration add-ons, or membership plugins like Ultimate Member — since these process registration/login through their own systems rather than WooCommerce's. Support for specific tools may be added in future based on demand.
+
 ## Roadmap — Pro version (coming soon)
 
 The free version covers email OTP end-to-end. A Pro tier is in development for stores that need more:
@@ -98,6 +102,20 @@ Watch this repo or [get in touch](mailto:support@xanteltech.com) to be notified 
 Version 1.0.1 included a security hardening pass: OTP verification is checked server-side on every flow (registration, login, checkout), with a brute-force-attempt limit on verification. See [CHANGELOG](#changelog) below. If you discover a security issue, please email **support@xanteltech.com** directly rather than opening a public issue.
 
 ## Changelog
+
+**1.2.0**
+- Added: "Checkout OTP Behavior" setting — choose between "Require OTP before placing order" (existing behavior) or "Flag unverified orders for review" (checkout is never blocked; orders are marked Email Verified: Yes/No on the Orders list and order screen instead, for HPOS and legacy order storage)
+
+**1.1.3**
+- Added: "On Plugin Deletion" setting — by default, deleting the plugin now preserves all data (OTP logs, verified users, trusted devices, settings) so a reinstall picks up where you left off. Opt in to full cleanup if you actually want it wiped.
+- Hardened: the plugin now checks that WooCommerce is active before doing anything, and shows an admin notice instead of a fatal error if WooCommerce is deactivated.
+- Declared compatibility with WooCommerce's High-Performance Order Storage (HPOS).
+
+**1.1.2**
+- When an OTP email fails to send, admins now see the actual underlying mail error alongside the generic message, for easier SMTP troubleshooting. Non-admin users still only see the generic message.
+
+**1.1.1**
+- Fixed: "Send OTP" could fail with a JavaScript error on themes that customize the registration/login/checkout markup and don't keep WooCommerce's default field ids. The plugin now falls back to WooCommerce's standard field names when the expected id isn't found.
 
 **1.1.0**
 - Renamed plugin to "Secure OTP Verification for WooCommerce" (previously "Xantel Email OTP")
