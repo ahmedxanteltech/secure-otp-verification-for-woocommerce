@@ -106,9 +106,21 @@ class XEO_OTP_Manager {
         return $sent;
     }
 
+    public static function log($level, $context, $email, $message) {
+        global $wpdb;
+        $wpdb->insert($wpdb->prefix . 'xantel_email_otp_log', [
+            'created_at' => current_time('mysql'),
+            'level'      => $level,   // 'info' | 'warning' | 'error'
+            'context'    => $context, // 'registration' | 'login' | 'checkout'
+            'email'      => $email,
+            'message'    => $message,
+        ]);
+    }
+
     public static function cleanup() {
         global $wpdb;
         $wpdb->query("DELETE FROM {$wpdb->prefix}xantel_email_otp WHERE expires_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+        $wpdb->query("DELETE FROM {$wpdb->prefix}xantel_email_otp_log WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
         XEO_Trusted_Device::cleanup();
     }
 }

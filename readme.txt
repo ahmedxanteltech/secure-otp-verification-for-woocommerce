@@ -4,7 +4,7 @@ Tags: otp, email verification, woocommerce, login, registration, checkout, secur
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,7 @@ Stop spam registrations, brute-force logins, and fraudulent checkouts with a sim
 * Skip checkout OTP for logged-in customers, while guest checkouts always stay verified (togglable)
 * Trusted-device login for password-based sign-in — a device that already passed password + OTP isn't asked for OTP again for an admin-configurable number of days (the password-less OTP-only tab always requires a fresh code, since it has no password backstop)
 * Checkout OTP Behavior: require OTP before placing an order, or flag unverified orders for admin review instead of blocking checkout — your choice, with an Email Verified column on the Orders list
+* Built-in debug log — every send/verify attempt is recorded with the exact reason for any failure (rate limit, wrong code, mail delivery error), viewable in Settings → Secure OTP without needing server access
 * Email Verified column in Dashboard → Users
 * Bulk mark users as verified/unverified, and bulk "forget" a user's trusted login devices
 * Rate limiting (max 3 OTPs per 10 minutes per email)
@@ -60,6 +61,10 @@ After 5 incorrect attempts for the same email and purpose within 10 minutes, fur
 
 No. Administrators (users who can manage_options) are always exempt from the OTP-only login requirement, so you can never lock yourself out.
 
+= Why don't my customers see a password field when registering? =
+
+This is a WooCommerce setting, not this plugin — check WooCommerce → Settings → Accounts & Privacy → "When creating an account, automatically generate an account password." If that's checked, WooCommerce hides the password field and only ever tells the customer their password by email. Combined with OTP verification, this can create a complete lockout with no fallback: if that one email is missed or fails to deliver, the customer has no password, and password reset is also email-based. We recommend unchecking it so customers set their own password at registration, with OTP as the added verification layer on top. This plugin shows a warning in wp-admin automatically if this setting is on.
+
 = Do returning customers have to enter an OTP at every checkout? =
 
 By default, logged-in customers skip checkout OTP entirely, since they already proved their account at registration or login. Guest checkouts always require OTP, since there's no account behind them to trust. You can turn this off in Settings → Secure OTP if you'd rather require a fresh OTP at every checkout regardless of login status.
@@ -94,6 +99,14 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 
 == Changelog ==
 
+= 1.2.2 =
+* Added: a warning in wp-admin if WooCommerce's "automatically generate account password" setting is enabled — combined with this plugin, that setting can create a complete customer lockout with no fallback (no known password, and password reset is also email-based).
+* Settings page header simplified.
+
+= 1.2.1 =
+* Added: a built-in Debug Log on the settings page. Every OTP send/verify attempt is now recorded with the exact reason for any failure (rate limit hit, wrong/expired code, mail delivery error with detail, invalid request, etc.), so "Send OTP isn't working" can be diagnosed from wp-admin without browser DevTools or server log access. Auto-clears entries older than 7 days; includes a manual "Clear Log" button.
+* The database schema now auto-migrates on version update (no need to deactivate/reactivate) — this also means future table/column additions will apply automatically when files are updated in place.
+
 = 1.2.0 =
 * Added: "Checkout OTP Behavior" setting — choose between "Require OTP before placing order" (existing behavior) or "Flag unverified orders for review" (checkout is never blocked; orders are marked Email Verified: Yes/No on the Orders list and order screen instead, for HPOS and legacy order storage).
 
@@ -124,6 +137,12 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.2.2 =
+Adds a warning for a WooCommerce setting that can silently cause customer lockouts when combined with this plugin.
+
+= 1.2.1 =
+Adds a built-in debug log for diagnosing OTP send/verify failures directly from wp-admin. Recommended update.
 
 = 1.2.0 =
 Adds a "Flag for review" checkout mode so an OTP delivery outage never has to block orders. Default behavior is unchanged unless you opt in.

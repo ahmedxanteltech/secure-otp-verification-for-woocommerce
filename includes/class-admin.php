@@ -7,6 +7,7 @@ class XEO_Admin {
         add_action('admin_menu',    [$this, 'add_menu']);
         add_action('admin_init',    [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'password_disabled_notice']);
+        add_action('admin_notices', [$this, 'auto_password_notice']);
     }
 
     public function add_menu() {
@@ -33,15 +34,45 @@ class XEO_Admin {
         </p></div>';
     }
 
+    /**
+     * WooCommerce's own "automatically generate an account password" setting
+     * hides the password field at registration and only ever tells the
+     * customer their password via email. Combined with this plugin, that
+     * silently recreates the exact single-point-of-failure this plugin was
+     * built to avoid: if that one email is lost, missed, or (as happened
+     * during development) never delivered due to an SMTP outage, the
+     * customer has no way to log in and no way to reset their password
+     * either, since password reset is also email-based.
+     */
+    public function auto_password_notice() {
+        if (get_option('woocommerce_registration_generate_password') !== 'yes') return;
+        if (!current_user_can('manage_options')) return;
+        echo '<div class="notice notice-warning"><p>
+            <strong>Secure OTP Verification:</strong> WooCommerce is currently set to auto-generate customer passwords
+            (sent only by email) instead of letting customers set their own at registration. If that email is ever missed
+            or fails to deliver, the customer has no password AND password reset also requires email — a complete lockout
+            with no fallback. We recommend letting customers set their own password during registration instead, with
+            OTP as the added verification layer. &nbsp;
+            <a href="' . esc_url(admin_url('admin.php?page=wc-settings&tab=account')) . '">Review WooCommerce account settings</a>
+        </p></div>';
+    }
+
     public function settings_page() {
         global $wpdb;
-        $table  = $wpdb->prefix . 'xantel_email_otp';
-        $vtable = $wpdb->prefix . 'xantel_email_otp_verified_users';
+        $table   = $wpdb->prefix . 'xantel_email_otp';
+        $vtable  = $wpdb->prefix . 'xantel_email_otp_verified_users';
+        $ltable  = $wpdb->prefix . 'xantel_email_otp_log';
+
+        if (isset($_POST['xeo_clear_log']) && check_admin_referer('xeo_clear_log')) {
+            $wpdb->query("TRUNCATE TABLE $ltable");
+            echo '<div class="notice notice-success is-dismissible"><p>✅ Log cleared!</p></div>';
+        }
 
         $total          = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
         $verified_otps  = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE verified=1");
         $verified_users = (int) $wpdb->get_var("SELECT COUNT(*) FROM $vtable");
         $recent         = $wpdb->get_results("SELECT email,purpose,created_at,verified FROM $table ORDER BY id DESC LIMIT 20");
+        $log_entries    = $wpdb->get_results("SELECT created_at,level,context,email,message FROM $ltable ORDER BY id DESC LIMIT 50");
 
         $current_mode      = xeo_get_mode();
         $password_disabled = xeo_password_login_disabled();
@@ -58,14 +89,9 @@ class XEO_Admin {
         ?>
         <div class="wrap">
             <!-- Header -->
-            <div style="display:flex;align-items:center;gap:15px;margin-bottom:20px;">
-                <div style="background:#1a1a2e;color:#fff;padding:10px 18px;border-radius:8px;font-size:18px;font-weight:bold;">
-                    Xantel
-                </div>
-                <div>
-                    <h1 style="margin:0;">Email OTP Settings</h1>
-                    <p style="margin:2px 0 0;color:#999;font-size:13px;">by <a href="https://xanteltech.com" target="_blank">Xantel Technologies</a> · v<?php echo XEO_VERSION; ?></p>
-                </div>
+            <div style="margin-bottom:20px;">
+                <h1 style="margin:0;">Secure OTP Verification for WooCommerce</h1>
+                <p style="margin:2px 0 0;color:#999;font-size:13px;">by <a href="https://xanteltech.com" target="_blank">Xantel Technologies</a> · v<?php echo XEO_VERSION; ?></p>
             </div>
 
             <?php if (isset($_GET['settings-updated'])): ?>
@@ -194,6 +220,42 @@ class XEO_Admin {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Debug log -->
+            <div style="background:#fff;padding:25px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,.08);margin-top:25px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h2 style="margin:0;">🛠️ Debug Log <span style="font-weight:normal;font-size:13px;color:#999;">(last 50 events, auto-cleared after 7 days)</span></h2>
+                    <form method="post" onsubmit="return confirm('Clear the debug log?');">
+                        <?php wp_nonce_field('xeo_clear_log'); ?>
+                        <button type="submit" name="xeo_clear_log" value="1" class="button">Clear Log</button>
+                    </form>
+                </div>
+                <p class="description" style="margin-bottom:15px;">
+                    Every OTP send/verify attempt is logged here, including exactly why one failed (rate limit, wrong code,
+                    mail delivery error, etc.) — check this first when a customer reports "Send OTP" not working, instead of
+                    needing browser DevTools or server access.
+                </p>
+                <?php if (empty($log_entries)): ?>
+                    <p style="color:#999;">No log entries yet.</p>
+                <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead><tr><th style="width:140px;">Time</th><th style="width:80px;">Level</th><th style="width:100px;">Context</th><th style="width:200px;">Email</th><th>Message</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($log_entries as $l):
+                            $color = ['error' => '#e74c3c', 'warning' => '#e67e22', 'info' => '#27ae60'][$l->level] ?? '#999';
+                        ?>
+                        <tr>
+                            <td><?=esc_html($l->created_at)?></td>
+                            <td><span style="color:<?=$color?>;font-weight:600;text-transform:uppercase;font-size:11px;"><?=esc_html($l->level)?></span></td>
+                            <td><span style="background:#ecf0f1;padding:3px 8px;border-radius:4px;font-size:12px;"><?=esc_html(ucfirst($l->context))?></span></td>
+                            <td><?=esc_html($l->email)?></td>
+                            <td><?=esc_html($l->message)?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
             </div>
         </div>
         <?php

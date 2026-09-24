@@ -16,6 +16,7 @@ global $wpdb;
 $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}xantel_email_otp");
 $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}xantel_email_otp_verified_users");
 $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}xantel_email_otp_trusted_devices");
+$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}xantel_email_otp_log");
 
 delete_option('xeo_otp_mode');
 delete_option('xeo_disable_password_login');
@@ -23,6 +24,7 @@ delete_option('xeo_skip_checkout_logged_in');
 delete_option('xeo_trusted_device_days');
 delete_option('xeo_checkout_mode');
 delete_option('xeo_delete_data_on_uninstall');
+delete_option('xeo_db_version');
 
 $timestamp = wp_next_scheduled('xeo_cleanup_otps');
 if ($timestamp) {

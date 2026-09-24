@@ -3,7 +3,7 @@
  * Plugin Name: Secure OTP Verification for WooCommerce
  * Plugin URI: https://xanteltech.com
  * Description: Secure email OTP verification for WooCommerce — Registration, Login and Checkout.
- * Version: 1.2.0
+ * Version: 1.2.2
  * Author: Xantel Technologies
  * Author URI: https://xanteltech.com
  * Text Domain: secure-otp-verification-for-woocommerce
@@ -13,7 +13,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('XEO_VERSION',    '1.2.0');
+define('XEO_VERSION',    '1.2.2');
 define('XEO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('XEO_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('XEO_OTP_EXPIRY', 120); // 2 minutes
@@ -82,6 +82,17 @@ function xeo_create_tables() {
         KEY user_id (user_id),
         KEY token_hash (token_hash)
     ) $charset;");
+
+    dbDelta("CREATE TABLE IF NOT EXISTS {$wpdb->prefix}xantel_email_otp_log (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        created_at datetime NOT NULL,
+        level varchar(10) NOT NULL,
+        context varchar(20) NOT NULL,
+        email varchar(100) DEFAULT NULL,
+        message text NOT NULL,
+        PRIMARY KEY (id),
+        KEY created_at (created_at)
+    ) $charset;");
 }
 
 // Settings helpers
@@ -122,6 +133,16 @@ function xeo_checkout_mode() {
 // plugin must fail safe (do nothing + tell the admin) rather than fatal-error
 // the whole site by calling WooCommerce functions that no longer exist.
 add_action('plugins_loaded', function () {
+    // Auto-migrate the DB schema when the plugin version changes, since
+    // updates here are typically deployed by overwriting files in place
+    // rather than deactivating/reactivating (which is what would otherwise
+    // trigger the activation hook that creates tables). dbDelta() is safe
+    // to re-run — it only adds/adjusts what's missing, never drops data.
+    if (get_option('xeo_db_version') !== XEO_VERSION) {
+        xeo_create_tables();
+        update_option('xeo_db_version', XEO_VERSION);
+    }
+
     if (!class_exists('WooCommerce')) {
         add_action('admin_notices', function () {
             echo '<div class="notice notice-error"><p><strong>Secure OTP Verification for WooCommerce</strong> is inactive because WooCommerce is not active. OTP verification is currently NOT being enforced on registration, login, or checkout. Please reactivate WooCommerce.</p></div>';
