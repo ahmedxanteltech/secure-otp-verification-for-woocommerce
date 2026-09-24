@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) exit;
 class XEO_Login {
 
     public function __construct() {
+        add_action('wp_loaded', [$this, 'bypass_wc_login_for_otp_only'], 1);
         add_action('woocommerce_login_form_start', [$this, 'add_login_tabs']);
         add_action('woocommerce_login_form',       [$this, 'add_otp_fields']);
         add_filter('authenticate', [$this, 'maybe_block_password_login'],    25, 3);
@@ -12,6 +13,26 @@ class XEO_Login {
         add_action('woocommerce_login_form_end', [$this, 'add_otp_login_form']);
         add_action('wp_loaded', [$this, 'handle_otp_only_login']);
         add_action('wp_login',  [$this, 'on_wp_login'], 10, 2);
+    }
+
+    /**
+     * The OTP-only login fields live inside WooCommerce's own outer login
+     * <form> (there's nowhere else for them to live without an invalid
+     * nested <form>), which means submitting them also carries along the
+     * empty, CSS-hidden native username/password fields and WooCommerce's
+     * own login nonce. That's enough for WooCommerce's own process_login()
+     * to also run on the same request and add its own "Username is
+     * required" notice — confusing, since the customer never saw a
+     * username field. Unhook it specifically for this one request, at an
+     * earlier priority than it's registered at, so our own OTP handling
+     * (further down this same 'wp_loaded' action) is the only thing that runs.
+     */
+    public function bypass_wc_login_for_otp_only() {
+        if (empty($_POST['xeo_otp_login_action'])) return;
+        if (class_exists('WC_Form_Handler')) {
+            remove_action('wp_loaded', ['WC_Form_Handler', 'process_login'], 10);
+            remove_action('wp_loaded', ['WC_Form_Handler', 'process_login'], 20);
+        }
     }
 
     public function add_login_tabs() {
@@ -66,7 +87,7 @@ class XEO_Login {
         <?php endif; ?>
 
         <div id="xeo-otp-only-login" style="<?php echo esc_attr($wrap_style); ?>">
-            <form method="post" class="woocommerce-form" id="xeo-otp-login-form">
+            <div class="woocommerce-form" id="xeo-otp-login-form">
                 <?php wp_nonce_field('xeo_otp_login', 'xeo_otp_login_nonce'); ?>
                 <input type="hidden" name="xeo_otp_login_action" value="1" />
 
@@ -102,7 +123,7 @@ class XEO_Login {
                         <?php esc_html_e('Login with OTP', 'secure-otp-verification-for-woocommerce'); ?>
                     </button>
                 </p>
-            </form>
+            </div>
         </div>
 
         <?php if ($force): ?>

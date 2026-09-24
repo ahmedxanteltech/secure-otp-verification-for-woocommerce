@@ -55,6 +55,49 @@ jQuery(function ($) {
         return $form.find(candidates).first();
     }
 
+    // ── Auto-submit once all 6 digits are entered ──────────────────────────
+    // Scoped to login and checkout-verify only — not registration, since
+    // that form has other required fields (name, password, etc.) and
+    // auto-submitting the whole thing the moment OTP hits 6 digits could
+    // fire before the user's finished the rest of the form. Login and
+    // checkout-verify are single-purpose "enter code → confirm" steps,
+    // so immediate submission is exactly what's expected there. Also
+    // removes reliance on the submit/verify button being visible — the
+    // buttons stay as a manual fallback, but most users won't need them.
+    var autoSubmitted = {};
+
+    $(document).on('input', '#xeo_login_otp, #xeo_otp_login_code, #xeo_checkout_otp', function () {
+        var $field = $(this);
+        var id     = $field.attr('id');
+        var val    = ($field.val() || '').trim();
+
+        if (!/^\d{6}$/.test(val) || !$field.is(':visible')) return;
+        if (autoSubmitted[id]) return;
+        autoSubmitted[id] = true;
+
+        if (id === 'xeo_checkout_otp') {
+            $('#xeo-checkout-verify-otp').trigger('click');
+        } else {
+            // Both login OTP fields live inside WooCommerce's own outer
+            // login <form> (there's no separate form to target), so this
+            // submits the whole login form — exactly what clicking the
+            // visible submit button would do. Using the native DOM method
+            // rather than jQuery's trigger('submit'), which isn't reliable
+            // for actually invoking browser form submission.
+            var formEl = $field.closest('form')[0];
+            if (formEl) {
+                if (typeof formEl.requestSubmit === 'function') formEl.requestSubmit();
+                else formEl.submit();
+            }
+        }
+    });
+
+    // Allow auto-submit to fire again if the user re-focuses the field
+    // after a failed attempt (e.g. wrong code) and retypes.
+    $(document).on('focus', '#xeo_login_otp, #xeo_otp_login_code, #xeo_checkout_otp', function () {
+        autoSubmitted[$(this).attr('id')] = false;
+    });
+
     // ── Send OTP ─────────────────────────────────────────────────────────────
     $(document).on('click', '.xeo-send-otp-btn', function (e) {
         e.preventDefault();

@@ -2,7 +2,7 @@
 
 **Stop fake accounts, account-sharing logins, and fraudulent orders — verify every customer's email with a one-time code, right inside WooCommerce.**
 
-[![WordPress Plugin Version](https://img.shields.io/badge/version-1.2.2-blue.svg)](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
+[![WordPress Plugin Version](https://img.shields.io/badge/version-1.2.5-blue.svg)](https://github.com/ahmedxanteltech/secure-otp-verification-for-woocommerce/releases)
 [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 [![WordPress](https://img.shields.io/badge/WordPress-5.6%2B-blue.svg)](https://wordpress.org)
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-required-96588a.svg)](https://woocommerce.com)
@@ -20,9 +20,13 @@ Fake registrations, throwaway emails, and typo'd addresses at checkout quietly c
 
 > _Screenshots coming soon — placeholders below, will be replaced with real captures._
 
-| Registration OTP | Login with OTP | Checkout Verification | Admin Dashboard |
-|---|---|---|---|
-| ![Registration screenshot placeholder](docs/screenshots/registration.png) | ![Login screenshot placeholder](docs/screenshots/login.png) | ![Checkout screenshot placeholder](docs/screenshots/checkout.png) | ![Admin screenshot placeholder](docs/screenshots/admin.png) |
+| Registration OTP | Login (password + OTP, trusted device) | Checkout Verification |
+|---|---|---|
+| ![Registration screenshot placeholder](docs/screenshots/registration.png) | ![Login screenshot placeholder](docs/screenshots/login.png) | ![Checkout screenshot placeholder](docs/screenshots/checkout.png) |
+
+| Admin Settings | Orders List (Email Verified) | Debug Log |
+|---|---|---|
+| ![Admin screenshot placeholder](docs/screenshots/admin.png) | ![Orders screenshot placeholder](docs/screenshots/orders.png) | ![Debug log screenshot placeholder](docs/screenshots/debug-log.png) |
 
 ## Features
 
@@ -32,6 +36,7 @@ Fake registrations, throwaway emails, and typo'd addresses at checkout quietly c
 - ✅ **Trusted-device login for password sign-in** — a device that already passed password + OTP isn't asked again for an admin-configurable number of days (the password-less OTP-only tab always requires a fresh code)
 - ✅ **Checkout OTP Behavior** — require OTP before placing an order, or flag unverified orders for admin review instead of blocking checkout, with an Email Verified column on the Orders list
 - ✅ **Built-in debug log** — every send/verify attempt is recorded with the exact failure reason, viewable in Settings → Secure OTP without needing server access
+- ✅ **Auto-submit on login/checkout OTP** — once all 6 digits are entered, no need to click a submit button (it stays available as a fallback)
 - ✅ **Force OTP-only login** — disable password login for all non-admin users store-wide
 - ✅ **Per-store configuration** — turn OTP on for registration only, registration + login, or all three
 - ✅ **Admin dashboard** — OTPs sent, verified, and blocked, at a glance, with a recent-activity log
@@ -106,6 +111,15 @@ Watch this repo or [get in touch](mailto:support@xanteltech.com) to be notified 
 Version 1.0.1 included a security hardening pass: OTP verification is checked server-side on every flow (registration, login, checkout), with a brute-force-attempt limit on verification. See [CHANGELOG](#changelog) below. If you discover a security issue, please email **support@xanteltech.com** directly rather than opening a public issue.
 
 ## Changelog
+
+**1.2.5**
+- Fixed: submitting the OTP-only login form could also trigger WooCommerce's own native login processing in the background, producing a confusing "Username is required" notice even on a successful OTP login. WooCommerce's own login handler is now explicitly skipped for OTP-only submissions.
+
+**1.2.4**
+- Added: OTP fields on login (both tabs) and checkout verification now auto-submit once all 6 digits are entered — no click required, though the submit/verify button remains as a manual fallback. Not applied to registration, since that form has other required fields.
+
+**1.2.3**
+- Fixed: the "Login with OTP" submit button could fail to appear after entering the code, specifically in "Force OTP-only login" mode. Caused by an invalid nested `<form>` element that browsers silently drop during parsing.
 
 **1.2.2**
 - Added: a warning in wp-admin if WooCommerce's "automatically generate account password" setting is enabled — combined with this plugin, that setting can create a complete customer lockout with no fallback.

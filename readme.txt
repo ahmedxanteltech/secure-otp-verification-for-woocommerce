@@ -4,7 +4,7 @@ Tags: otp, email verification, woocommerce, login, registration, checkout, secur
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.2
+Stable tag: 1.2.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,7 @@ Stop spam registrations, brute-force logins, and fraudulent checkouts with a sim
 * Trusted-device login for password-based sign-in — a device that already passed password + OTP isn't asked for OTP again for an admin-configurable number of days (the password-less OTP-only tab always requires a fresh code, since it has no password backstop)
 * Checkout OTP Behavior: require OTP before placing an order, or flag unverified orders for admin review instead of blocking checkout — your choice, with an Email Verified column on the Orders list
 * Built-in debug log — every send/verify attempt is recorded with the exact reason for any failure (rate limit, wrong code, mail delivery error), viewable in Settings → Secure OTP without needing server access
+* Auto-submit on login/checkout OTP once all 6 digits are entered — no need to click a submit button, though it stays available as a fallback
 * Email Verified column in Dashboard → Users
 * Bulk mark users as verified/unverified, and bulk "forget" a user's trusted login devices
 * Rate limiting (max 3 OTPs per 10 minutes per email)
@@ -92,12 +93,22 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 == Screenshots ==
 
 1. Email OTP field on the WooCommerce registration form
-2. OTP login tab alongside password login
-3. Checkout email verification step
-4. Admin settings and OTP activity dashboard
-5. Email Verified column on the Users screen
+2. Login page with password + OTP and OTP-only tabs, plus trusted-device login
+3. Checkout email verification step for guest checkout
+4. Admin settings — OTP mode, checkout behavior, trusted-device duration
+5. Email Verified column on the Orders list (Flag for review mode)
+6. Built-in debug log showing send/verify activity and failure reasons
 
 == Changelog ==
+
+= 1.2.5 =
+* Fixed: submitting the OTP-only login form could also trigger WooCommerce's own native login processing in the background (since both share the same outer form), producing a confusing "Username is required" notice even on a successful OTP login. WooCommerce's own login handler is now explicitly skipped for OTP-only submissions.
+
+= 1.2.4 =
+* Added: OTP fields on login (both tabs) and checkout verification now auto-submit once all 6 digits are entered — no click required, though the submit/verify button remains as a manual fallback. Not applied to registration, since that form has other required fields.
+
+= 1.2.3 =
+* Fixed: the "Login with OTP" submit button could fail to appear after entering the code, specifically in "Force OTP-only login" mode. Caused by an invalid nested <form> element that browsers silently drop during parsing; the OTP-only login fields no longer use their own <form> tag, since they were already inside WooCommerce's own login form.
 
 = 1.2.2 =
 * Added: a warning in wp-admin if WooCommerce's "automatically generate account password" setting is enabled — combined with this plugin, that setting can create a complete customer lockout with no fallback (no known password, and password reset is also email-based).
@@ -137,6 +148,15 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.2.5 =
+Fixes a confusing spurious "Username is required" message that could appear after a successful OTP-only login. Recommended update if you use that mode.
+
+= 1.2.4 =
+Login and checkout OTP now auto-submit after 6 digits — one less click, one less thing that can go wrong on cached pages.
+
+= 1.2.3 =
+Fixes a missing submit button in "Force OTP-only login" mode. Important update if you use that mode.
 
 = 1.2.2 =
 Adds a warning for a WooCommerce setting that can silently cause customer lockouts when combined with this plugin.
