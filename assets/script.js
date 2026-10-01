@@ -149,6 +149,28 @@ jQuery(function ($) {
         submitOtpOnlyLogin();
     });
 
+    // The OTP-only email/code fields are AJAX-only, but they still
+    // physically sit inside WooCommerce's outer <form> (there's nowhere
+    // else for them to live). Pressing Enter in a focused text input is a
+    // browser default that submits the ENCLOSING form regardless of our own
+    // click handlers — with the real username/password fields empty, that
+    // produces WooCommerce's own "Username is required" notice. Explicitly
+    // stop Enter from reaching that default behavior and route it to the
+    // equivalent action instead.
+    $(document).on('keydown', '#xeo_otp_login_email', function (e) {
+        if (e.which !== 13 && e.keyCode !== 13) return;
+        e.preventDefault();
+        e.stopPropagation();
+        $('#xeo-otp-only-login .xeo-send-otp-btn').trigger('click');
+    });
+
+    $(document).on('keydown', '#xeo_otp_login_code', function (e) {
+        if (e.which !== 13 && e.keyCode !== 13) return;
+        e.preventDefault();
+        e.stopPropagation();
+        submitOtpOnlyLogin();
+    });
+
     // Allow auto-submit to fire again if the user re-focuses the field
     // after a failed attempt (e.g. wrong code) and retypes.
     $(document).on('focus', '#xeo_login_otp, #xeo_otp_login_code, #xeo_checkout_otp', function () {

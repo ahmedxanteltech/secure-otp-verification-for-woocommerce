@@ -4,7 +4,7 @@ Tags: otp, email verification, woocommerce, login, registration, checkout, secur
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.7
+Stable tag: 1.2.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -101,6 +101,10 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 
 == Changelog ==
 
+= 1.2.8.1 =
+* Fixed: pressing Enter while focused in the OTP-only login's email/code fields could trigger WooCommerce's own native form submission (since those fields still live inside WooCommerce's shared login form), producing a "Username is required" notice. Enter is now explicitly intercepted and routed to the same action as clicking Send OTP / Login with OTP.
+* Fixed: on some setups, the page landed on after a successful OTP-only login could still show the login form despite a valid, correctly-set session cookie. Root cause: the browser's own speculative prefetching (e.g. Chrome's "Preload pages" feature) can fetch the destination page before login completes, then serve that stale pre-login copy from its local prefetch cache instead of requesting the page again — bypassing the server (and any server-side cache) entirely. The post-login redirect URL now includes a unique parameter so the browser can't satisfy it from a prefetched copy.
+
 = 1.2.7 =
 * Changed: OTP-only login ("Login with OTP" tab / forced OTP-only mode) is now handled entirely over AJAX instead of a native form submission. This avoids a class of theme-compatibility issues where a theme's own hidden-but-required fields block browser form validation, a theme's own JavaScript intercepts the login form submission, or a caching layer serves a stale page after the redirect that followed a successful login. The redirect to My Account now happens client-side, after the session cookie is already set.
 * Added: a cache-compatibility admin notice that detects common caching plugins (LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache) and warns if My Account / checkout may need to be excluded from page caching, with plugin-specific guidance.
@@ -155,6 +159,9 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.2.8.1 =
+Fixes two remaining OTP-only login issues: Enter key triggering a spurious WooCommerce error, and the destination page sometimes showing logged-out due to browser-side prefetch caching. Recommended update if you use OTP-only login.
 
 = 1.2.7 =
 OTP-only login is now AJAX-based for much better compatibility with custom themes and caching plugins, admin notices are now properly dismissible, and a new notice warns about caching plugins that may need My Account excluded. Recommended update, especially if you use "Force OTP-only login" mode or a page caching plugin.

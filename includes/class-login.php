@@ -196,11 +196,23 @@ class XEO_Login {
         // The redirect happens client-side (script.js does
         // window.location.href to this URL) once this AJAX response is
         // back — by then the browser already holds the fresh session
-        // cookie, so the destination page renders logged-in on its very
-        // first real request. Base My Account page rather than the
+        // cookie, so the destination page should render logged-in on its
+        // very first real request. Base My Account page rather than the
         // "dashboard" endpoint specifically, since the endpoint depends on
         // WooCommerce's rewrite rules being registered/flushed correctly.
-        wp_send_json_success(['redirect' => wc_get_page_permalink('myaccount')]);
+        //
+        // A unique query string is appended to defeat the browser's own
+        // speculative prefetching (Chrome's "Preload pages" / NoState
+        // Prefetch can fetch /my-account/ before the customer even submits
+        // the OTP — e.g. because it appears as a nearby link — and that
+        // prefetched copy is necessarily the pre-login, logged-out page).
+        // Without this, window.location.href can be served straight from
+        // that stale prefetch cache instead of making a real request, so
+        // the browser never actually asks the server again at all — no
+        // amount of server-side cache configuration can fix that, since
+        // the server is never even contacted for that navigation.
+        $redirect = add_query_arg('_xeo_fresh', (string) time(), wc_get_page_permalink('myaccount'));
+        wp_send_json_success(['redirect' => $redirect]);
     }
 
     public function maybe_block_password_login($user, $username, $password) {
