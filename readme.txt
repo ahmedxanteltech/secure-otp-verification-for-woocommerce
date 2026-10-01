@@ -4,7 +4,7 @@ Tags: otp, email verification, woocommerce, login, registration, checkout, secur
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.5
+Stable tag: 1.2.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -101,6 +101,13 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 
 == Changelog ==
 
+= 1.2.7 =
+* Changed: OTP-only login ("Login with OTP" tab / forced OTP-only mode) is now handled entirely over AJAX instead of a native form submission. This avoids a class of theme-compatibility issues where a theme's own hidden-but-required fields block browser form validation, a theme's own JavaScript intercepts the login form submission, or a caching layer serves a stale page after the redirect that followed a successful login. The redirect to My Account now happens client-side, after the session cookie is already set.
+* Added: a cache-compatibility admin notice that detects common caching plugins (LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache) and warns if My Account / checkout may need to be excluded from page caching, with plugin-specific guidance.
+* Fixed: all admin notices (password-login-disabled, WooCommerce auto-password warning, and the new cache-compatibility notice) are now properly dismissible and stay dismissed per-admin, instead of reappearing on every admin page with no way to close them.
+* Added: expanded debug logging around the login flow so a login failure (or an auth cookie that doesn't persist) can be diagnosed from the Debug Log rather than needing browser DevTools or server access.
+* Hardened: sends no-cache response headers during OTP-only login processing as a safety net against full-page caching plugins that don't recognize a custom login flow.
+
 = 1.2.5 =
 * Fixed: submitting the OTP-only login form could also trigger WooCommerce's own native login processing in the background (since both share the same outer form), producing a confusing "Username is required" notice even on a successful OTP login. WooCommerce's own login handler is now explicitly skipped for OTP-only submissions.
 
@@ -148,6 +155,9 @@ A Pro version with WhatsApp/SMS OTP, magic-link login, and an analytics dashboar
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.2.7 =
+OTP-only login is now AJAX-based for much better compatibility with custom themes and caching plugins, admin notices are now properly dismissible, and a new notice warns about caching plugins that may need My Account excluded. Recommended update, especially if you use "Force OTP-only login" mode or a page caching plugin.
 
 = 1.2.5 =
 Fixes a confusing spurious "Username is required" message that could appear after a successful OTP-only login. Recommended update if you use that mode.

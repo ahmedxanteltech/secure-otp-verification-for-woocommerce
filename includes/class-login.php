@@ -4,35 +4,31 @@ if (!defined('ABSPATH')) exit;
 class XEO_Login {
 
     public function __construct() {
-        add_action('wp_loaded', [$this, 'bypass_wc_login_for_otp_only'], 1);
         add_action('woocommerce_login_form_start', [$this, 'add_login_tabs']);
         add_action('woocommerce_login_form',       [$this, 'add_otp_fields']);
         add_filter('authenticate', [$this, 'maybe_block_password_login'],    25, 3);
         add_filter('authenticate', [$this, 'maybe_block_password_login_wp'], 25, 3);
         add_filter('authenticate', [$this, 'validate_otp'], 30, 3);
         add_action('woocommerce_login_form_end', [$this, 'add_otp_login_form']);
-        add_action('wp_loaded', [$this, 'handle_otp_only_login']);
         add_action('wp_login',  [$this, 'on_wp_login'], 10, 2);
-    }
 
-    /**
-     * The OTP-only login fields live inside WooCommerce's own outer login
-     * <form> (there's nowhere else for them to live without an invalid
-     * nested <form>), which means submitting them also carries along the
-     * empty, CSS-hidden native username/password fields and WooCommerce's
-     * own login nonce. That's enough for WooCommerce's own process_login()
-     * to also run on the same request and add its own "Username is
-     * required" notice — confusing, since the customer never saw a
-     * username field. Unhook it specifically for this one request, at an
-     * earlier priority than it's registered at, so our own OTP handling
-     * (further down this same 'wp_loaded' action) is the only thing that runs.
-     */
-    public function bypass_wc_login_for_otp_only() {
-        if (empty($_POST['xeo_otp_login_action'])) return;
-        if (class_exists('WC_Form_Handler')) {
-            remove_action('wp_loaded', ['WC_Form_Handler', 'process_login'], 10);
-            remove_action('wp_loaded', ['WC_Form_Handler', 'process_login'], 20);
-        }
+        // OTP-only login (the password-less tab, and the forced-OTP mode)
+        // is handled entirely over AJAX rather than a native <form> submit.
+        // Every bug we chased in earlier versions — an invalid nested
+        // <form>, a theme's own hidden-but-required fields blocking native
+        // HTML5 validation on submit, a homepage popup silently hijacking
+        // or mishandling the form submission, a full-page cache serving a
+        // stale copy of the page the browser lands on after a server-side
+        // redirect — all stemmed from relying on a real form submission
+        // inside theme-controlled markup. An AJAX call sidesteps all of it:
+        // there's no form for the browser to validate or a theme to
+        // restructure, and the redirect happens client-side, after the
+        // browser already has the fresh session cookie in hand. This
+        // mirrors how checkout OTP verification already works in this
+        // plugin, and how at least one well-established SMS-OTP login
+        // plugin (Digits) structures its own login flow.
+        add_action('wp_ajax_nopriv_xeo_otp_login', [$this, 'ajax_otp_login']);
+        add_action('wp_ajax_xeo_otp_login',        [$this, 'ajax_otp_login']);
     }
 
     public function add_login_tabs() {
@@ -86,10 +82,15 @@ class XEO_Login {
         </div>
         <?php endif; ?>
 
+        <!--
+            This whole block is a plain <div>, not a <form> — the OTP-only
+            login is submitted entirely over AJAX (see ajax_otp_login()
+            below), so there is nothing here for the browser to validate or
+            for the surrounding theme form to interfere with.
+        -->
         <div id="xeo-otp-only-login" style="<?php echo esc_attr($wrap_style); ?>">
             <div class="woocommerce-form" id="xeo-otp-login-form">
-                <?php wp_nonce_field('xeo_otp_login', 'xeo_otp_login_nonce'); ?>
-                <input type="hidden" name="xeo_otp_login_action" value="1" />
+                <input type="hidden" id="xeo_otp_login_ajax_nonce" value="<?php echo esc_attr(wp_create_nonce('xeo_otp_login')); ?>" />
 
                 <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
                     <label for="xeo_otp_login_email"><?php esc_html_e('Email Address', 'secure-otp-verification-for-woocommerce'); ?> <span class="required">*</span></label>
@@ -119,7 +120,7 @@ class XEO_Login {
                 </p>
 
                 <p class="form-row" id="xeo-otp-login-submit-row" style="display:none;">
-                    <button type="submit" class="woocommerce-Button button alt" name="xeo_otp_login_submit">
+                    <button type="button" class="woocommerce-Button button alt" id="xeo-otp-login-submit-btn">
                         <?php esc_html_e('Login with OTP', 'secure-otp-verification-for-woocommerce'); ?>
                     </button>
                 </p>
@@ -135,33 +136,71 @@ class XEO_Login {
                 if (el.tagName !== 'INPUT' && el.id !== 'xeo-otp-only-login') el.style.display = 'none';
             });
             document.getElementById('xeo-otp-only-login').style.display = 'block';
+
+            // Some themes (e.g. Nasa) rename WooCommerce's own login fields
+            // (nasa_username / nasa_password) but still mark them `required`.
+            // Hiding their wrapping <p> above makes them display:none while
+            // still required, which the browser's native form validation
+            // refuses to submit — it can't focus a hidden field to show the
+            // error, so it silently blocks the whole form instead. Since
+            // we've deliberately hidden every field except our own OTP
+            // fields, native validation no longer applies to this form at
+            // all. (Our own OTP-only login button is a plain AJAX click
+            // now and never triggers this anyway, but the password+OTP
+            // tab's fields still live in this same <form>.)
+            form.noValidate = true;
         });
         </script>
         <?php endif;
     }
 
-    public function handle_otp_only_login() {
-        if (empty($_POST['xeo_otp_login_action'])) return;
-        if (!wp_verify_nonce($_POST['xeo_otp_login_nonce'] ?? '', 'xeo_otp_login')) return;
+    /**
+     * OTP-only login, handled entirely over AJAX. No password gates this
+     * login path, so trusted-device is never consulted here — a stolen
+     * cookie must not be enough on its own to sign in. A fresh OTP is
+     * always required.
+     */
+    public function ajax_otp_login() {
+        check_ajax_referer('xeo_otp_login', 'nonce');
 
-        $email = sanitize_email($_POST['xeo_otp_login_email'] ?? '');
-        $otp   = sanitize_text_field($_POST['xeo_otp_login_code'] ?? '');
+        $email = sanitize_email($_POST['email'] ?? '');
+        $otp   = sanitize_text_field($_POST['otp'] ?? '');
 
-        if (!is_email($email)) { wc_add_notice('Please enter a valid email address.', 'error'); return; }
+        XEO_OTP_Manager::log('info', 'login_otp_only', $email, 'AJAX OTP-only login attempt received.');
+
+        if (!is_email($email)) {
+            XEO_OTP_Manager::log('error', 'login_otp_only', $email, 'Email field failed is_email() validation.');
+            wp_send_json_error(['message' => __('Please enter a valid email address.', 'secure-otp-verification-for-woocommerce')]);
+        }
+
         $user = get_user_by('email', $email);
-        if (!$user)            { wc_add_notice('No account found with this email address.', 'error'); return; }
+        if (!$user) {
+            XEO_OTP_Manager::log('error', 'login_otp_only', $email, 'No WordPress user found with this email.');
+            wp_send_json_error(['message' => __('No account found with this email address.', 'secure-otp-verification-for-woocommerce')]);
+        }
 
-        // No password gates this login path, so trusted-device is never
-        // consulted here — a stolen cookie must not be enough on its own
-        // to sign in. A fresh OTP is always required.
-        if (!XEO_OTP_Manager::verify($email, $otp, 'login')) { wc_add_notice('Invalid or expired OTP.', 'error'); return; }
+        if (!XEO_OTP_Manager::verify($email, $otp, 'login')) {
+            XEO_OTP_Manager::log('error', 'login_otp_only', $email, 'OTP failed verify() — wrong code, expired, or already consumed.');
+            wp_send_json_error(['message' => __('Invalid or expired OTP.', 'secure-otp-verification-for-woocommerce')]);
+        }
+
+        XEO_OTP_Manager::log('info', 'login_otp_only', $email, 'OTP verified. Setting auth cookie for user ID ' . $user->ID . '.');
 
         do_action('xeo_otp_verified', $user->ID, $email);
         wp_set_current_user($user->ID);
         wp_set_auth_cookie($user->ID, true);
         do_action('wp_login', $user->user_login, $user);
-        wp_redirect(wc_get_account_endpoint_url('dashboard'));
-        exit;
+
+        XEO_OTP_Manager::log('info', 'login_otp_only', $email, 'is_user_logged_in() after wp_set_auth_cookie: ' . (is_user_logged_in() ? 'yes' : 'NO — cookie did not take effect'));
+
+        // The redirect happens client-side (script.js does
+        // window.location.href to this URL) once this AJAX response is
+        // back — by then the browser already holds the fresh session
+        // cookie, so the destination page renders logged-in on its very
+        // first real request. Base My Account page rather than the
+        // "dashboard" endpoint specifically, since the endpoint depends on
+        // WooCommerce's rewrite rules being registered/flushed correctly.
+        wp_send_json_success(['redirect' => wc_get_page_permalink('myaccount')]);
     }
 
     public function maybe_block_password_login($user, $username, $password) {

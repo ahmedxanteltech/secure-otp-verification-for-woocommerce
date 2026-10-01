@@ -112,6 +112,13 @@ Version 1.0.1 included a security hardening pass: OTP verification is checked se
 
 ## Changelog
 
+**1.2.7**
+- Changed: OTP-only login ("Login with OTP" tab / forced OTP-only mode) now runs entirely over AJAX instead of a native form submission — avoids a class of theme-compatibility issues (hidden-but-required theme fields blocking native browser validation, theme JS intercepting the form submission, a caching layer serving a stale page after the post-login redirect). The redirect to My Account now happens client-side, after the session cookie is already set.
+- Added: a cache-compatibility admin notice that detects common caching plugins (LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache) and warns if My Account/checkout may need to be excluded from page caching.
+- Fixed: all admin notices are now properly dismissible and stay dismissed per-admin, instead of reappearing on every admin page with no way to close them.
+- Added: expanded debug logging around the login flow for easier diagnosis of login/session issues from the Debug Log.
+- Hardened: sends no-cache response headers during OTP-only login processing as a safety net against full-page caching plugins.
+
 **1.2.5**
 - Fixed: submitting the OTP-only login form could also trigger WooCommerce's own native login processing in the background, producing a confusing "Username is required" notice even on a successful OTP login. WooCommerce's own login handler is now explicitly skipped for OTP-only submissions.
 

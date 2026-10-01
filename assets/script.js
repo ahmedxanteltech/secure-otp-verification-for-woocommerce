@@ -77,19 +77,76 @@ jQuery(function ($) {
 
         if (id === 'xeo_checkout_otp') {
             $('#xeo-checkout-verify-otp').trigger('click');
+        } else if (id === 'xeo_otp_login_code') {
+            // The password-less "Login with OTP" tab is a plain AJAX call
+            // (see submitOtpOnlyLogin below), not a form submission at all —
+            // this sidesteps every theme-markup/validation/caching issue a
+            // real <form> submit and server redirect ran into previously.
+            submitOtpOnlyLogin();
         } else {
-            // Both login OTP fields live inside WooCommerce's own outer
-            // login <form> (there's no separate form to target), so this
-            // submits the whole login form — exactly what clicking the
-            // visible submit button would do. Using the native DOM method
-            // rather than jQuery's trigger('submit'), which isn't reliable
-            // for actually invoking browser form submission.
+            // The password+OTP tab's field (xeo_login_otp) is still a real
+            // WordPress login form submission, going through the normal
+            // 'authenticate' filter — that path hasn't had these issues,
+            // so it's left as a native form submit.
             var formEl = $field.closest('form')[0];
             if (formEl) {
+                // Some themes rename or otherwise leave their own required
+                // fields (e.g. Nasa theme's nasa_username/nasa_password)
+                // inside this same <form>, sometimes hidden. requestSubmit()
+                // runs the browser's native constraint validation across the
+                // WHOLE form, and a hidden required field can't be focused
+                // to show its error — so the browser just silently refuses
+                // to submit at all. Since our own OTP field is validated
+                // server-side anyway, skip native validation here too.
+                formEl.noValidate = true;
                 if (typeof formEl.requestSubmit === 'function') formEl.requestSubmit();
                 else formEl.submit();
             }
         }
+    });
+
+    // ── OTP-only login (password-less tab), fully AJAX ─────────────────────
+    // Handles both the manual "Login with OTP" button and the auto-submit
+    // above. On success, the browser already holds the fresh session
+    // cookie from this AJAX response before we ever navigate anywhere, so
+    // the destination page renders logged-in on its first real request —
+    // no server-side redirect chain for a cache layer or theme popup script
+    // to interfere with.
+    function submitOtpOnlyLogin() {
+        var email = ($('#xeo_otp_login_email').val() || '').trim();
+        var otp   = ($('#xeo_otp_login_code').val() || '').trim();
+        var nonce = $('#xeo_otp_login_ajax_nonce').val();
+        var $btn  = $('#xeo-otp-login-submit-btn');
+
+        if (!otp || otp.length !== 6) { xeoShowMsg('login', 'Please enter a valid 6-digit OTP.', 'error'); return; }
+
+        $btn.prop('disabled', true).text('Logging in…');
+
+        $.ajax({
+            url:  xeo_ajax.ajax_url,
+            type: 'POST',
+            data: { action: 'xeo_otp_login', email: email, otp: otp, nonce: nonce },
+            success: function (res) {
+                if (res.success) {
+                    xeoShowMsg('login', 'Login successful! Redirecting…', 'success');
+                    setTimeout(function () { window.location.href = res.data.redirect; }, 400);
+                } else {
+                    xeoShowMsg('login', res.data.message, 'error');
+                    $btn.prop('disabled', false).text('Login with OTP');
+                    autoSubmitted['xeo_otp_login_code'] = false;
+                }
+            },
+            error: function () {
+                xeoShowMsg('login', 'Something went wrong. Please try again.', 'error');
+                $btn.prop('disabled', false).text('Login with OTP');
+                autoSubmitted['xeo_otp_login_code'] = false;
+            }
+        });
+    }
+
+    $(document).on('click', '#xeo-otp-login-submit-btn', function (e) {
+        e.preventDefault();
+        submitOtpOnlyLogin();
     });
 
     // Allow auto-submit to fire again if the user re-focuses the field

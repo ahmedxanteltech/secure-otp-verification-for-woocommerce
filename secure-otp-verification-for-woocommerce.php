@@ -3,7 +3,7 @@
  * Plugin Name: Secure OTP Verification for WooCommerce
  * Plugin URI: https://xanteltech.com
  * Description: Secure email OTP verification for WooCommerce — Registration, Login and Checkout.
- * Version: 1.2.5
+ * Version: 1.2.7
  * Author: Xantel Technologies
  * Author URI: https://xanteltech.com
  * Text Domain: secure-otp-verification-for-woocommerce

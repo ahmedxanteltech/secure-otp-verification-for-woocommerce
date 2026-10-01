@@ -8,6 +8,9 @@ class XEO_Admin {
         add_action('admin_init',    [$this, 'register_settings']);
         add_action('admin_notices', [$this, 'password_disabled_notice']);
         add_action('admin_notices', [$this, 'auto_password_notice']);
+        add_action('admin_notices', [$this, 'cache_compatibility_notice']);
+        add_action('admin_footer',  [$this, 'print_dismiss_notice_script']);
+        add_action('wp_ajax_xeo_dismiss_notice', [$this, 'ajax_dismiss_notice']);
     }
 
     public function add_menu() {
@@ -25,9 +28,56 @@ class XEO_Admin {
         }]);
     }
 
+    /**
+     * Persistent, per-admin notice dismissal. Notices here warn about real
+     * lockout/security/staleness risks, so a dismissal is scoped to the
+     * admin who saw and acknowledged it (user meta) rather than hidden for
+     * everyone — a different admin who hasn't seen the warning yet should
+     * still get it.
+     */
+    private function notice_dismissed($key) {
+        $dismissed = get_user_meta(get_current_user_id(), 'xeo_dismissed_notices', true);
+        return is_array($dismissed) && in_array($key, $dismissed, true);
+    }
+
+    public function ajax_dismiss_notice() {
+        check_ajax_referer('xeo_dismiss_notice', 'nonce');
+        $notice = isset($_POST['notice']) ? sanitize_key($_POST['notice']) : '';
+        if ($notice) {
+            $dismissed = get_user_meta(get_current_user_id(), 'xeo_dismissed_notices', true);
+            if (!is_array($dismissed)) $dismissed = [];
+            $dismissed[] = $notice;
+            update_user_meta(get_current_user_id(), 'xeo_dismissed_notices', array_values(array_unique($dismissed)));
+        }
+        wp_die();
+    }
+
+    /**
+     * WordPress's own "is-dismissible" class only hides a notice visually
+     * for the current page load — it doesn't persist anything on its own.
+     * This tiny script hooks the dismiss button WordPress already injects
+     * for that class, and reports the dismissal back to us so the notice
+     * actually stays gone for this admin on future page loads too.
+     */
+    public function print_dismiss_notice_script() {
+        $nonce = wp_create_nonce('xeo_dismiss_notice');
+        ?>
+        <script>
+        jQuery(function ($) {
+            $(document).on('click', '.xeo-dismissible-notice .notice-dismiss', function () {
+                var key = $(this).closest('.xeo-dismissible-notice').data('xeo-notice');
+                if (!key) return;
+                $.post(ajaxurl, { action: 'xeo_dismiss_notice', notice: key, nonce: '<?php echo esc_js($nonce); ?>' });
+            });
+        });
+        </script>
+        <?php
+    }
+
     public function password_disabled_notice() {
         if (!xeo_password_login_disabled()) return;
-        echo '<div class="notice notice-warning"><p>
+        if ($this->notice_dismissed('password_disabled')) return;
+        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="password_disabled"><p>
             <strong>Secure OTP Verification:</strong> Password-based login is currently <strong>disabled</strong>.
             Users can only log in via Email OTP. &nbsp;
             <a href="' . esc_url(admin_url('options-general.php?page=secure-otp-verification-for-woocommerce')) . '">Change setting</a>
@@ -47,13 +97,57 @@ class XEO_Admin {
     public function auto_password_notice() {
         if (get_option('woocommerce_registration_generate_password') !== 'yes') return;
         if (!current_user_can('manage_options')) return;
-        echo '<div class="notice notice-warning"><p>
+        if ($this->notice_dismissed('auto_password_lockout')) return;
+        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="auto_password_lockout"><p>
             <strong>Secure OTP Verification:</strong> WooCommerce is currently set to auto-generate customer passwords
             (sent only by email) instead of letting customers set their own at registration. If that email is ever missed
             or fails to deliver, the customer has no password AND password reset also requires email — a complete lockout
             with no fallback. We recommend letting customers set their own password during registration instead, with
             OTP as the added verification layer. &nbsp;
             <a href="' . esc_url(admin_url('admin.php?page=wc-settings&tab=account')) . '">Review WooCommerce account settings</a>
+        </p></div>';
+    }
+
+    /**
+     * OTP login and the "skip checkout OTP for logged-in customers" feature
+     * both depend on My Account / checkout being rendered fresh, per visitor.
+     * A full-page cache plugin that isn't configured to exclude those pages
+     * (or that caches logged-in users without proper personalization support)
+     * can serve a stale or even cross-visitor page there — this was hit
+     * directly during development with LiteSpeed Cache's "Cache Logged-in
+     * Users" option. Only warns when a known caching plugin is actually
+     * detected, with plugin-specific guidance where we can give it.
+     */
+    public function cache_compatibility_notice() {
+        if (!current_user_can('manage_options')) return;
+        if ($this->notice_dismissed('cache_compat')) return;
+
+        if (defined('LSCWP_V') || class_exists('LiteSpeed_Cache')) {
+            $tip = 'You\'re running <strong>LiteSpeed Cache</strong>. In LiteSpeed Cache &rarr; Cache, add <code>/my-account/*</code>
+                (and ideally <code>/cart/*</code>, <code>/checkout/*</code>) under &ldquo;Do Not Cache URIs&rdquo;, and make sure
+                <strong>&ldquo;Cache Logged-in Users&rdquo;</strong> is disabled unless your theme fully supports ESI for personalized content.';
+        } elseif (defined('WP_ROCKET_VERSION')) {
+            $tip = 'You\'re running <strong>WP Rocket</strong>. Under its Cache settings, confirm &ldquo;Cache logged-in users&rdquo; is off,
+                and add <code>/my-account/*</code> to Never Cache URLs if it isn\'t already excluded automatically.';
+        } elseif (defined('W3TC')) {
+            $tip = 'You\'re running <strong>W3 Total Cache</strong>. Under Page Cache settings, make sure logged-in users aren\'t cached,
+                and add <code>/my-account/*</code> to &ldquo;Never cache the following pages&rdquo;.';
+        } elseif (function_exists('wpfc_clear_all_cache')) {
+            $tip = 'You\'re running <strong>WP Fastest Cache</strong>. Under its exclusion rules, exclude <code>/my-account/*</code>
+                and make sure logged-in users are excluded from caching.';
+        } elseif (defined('WPSC_VERSION')) {
+            $tip = 'You\'re running <strong>WP Super Cache</strong>. Make sure &ldquo;Don\'t cache pages for known users&rdquo; is enabled,
+                and consider rejecting <code>/my-account/</code> under Advanced settings.';
+        } else {
+            return; // No known caching plugin detected — nothing actionable to warn about.
+        }
+
+        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="cache_compat"><p>
+            <strong>Secure OTP Verification:</strong> a page caching plugin is active on this site. OTP login and the
+            &ldquo;skip checkout OTP for logged-in customers&rdquo; feature both depend on My Account and checkout being
+            rendered fresh for each logged-in visitor — if those pages get served from a shared cache instead, a
+            customer can see a stale login form right after successfully verifying, or (in misconfigured setups) one
+            visitor\'s cached page can bleed into another\'s. ' . $tip . '
         </p></div>';
     }
 
