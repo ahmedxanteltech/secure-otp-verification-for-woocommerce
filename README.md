@@ -18,15 +18,13 @@ Fake registrations, throwaway emails, and typo'd addresses at checkout quietly c
 
 ## Screenshots
 
-> _Screenshots coming soon — placeholders below, will be replaced with real captures._
-
 | Registration OTP | Login (password + OTP, trusted device) | Checkout Verification |
 |---|---|---|
-| ![Registration screenshot placeholder](docs/screenshots/registration.png) | ![Login screenshot placeholder](docs/screenshots/login.png) | ![Checkout screenshot placeholder](docs/screenshots/checkout.png) |
+| ![Registration OTP field on the WooCommerce registration form](docs/screenshots/registration.png) | ![Login page with password + OTP and OTP-only tabs, plus trusted-device login](docs/screenshots/login.png) | ![Checkout email verification step for guest checkout](docs/screenshots/checkout.png) |
 
 | Admin Settings | Orders List (Email Verified) | Debug Log |
 |---|---|---|
-| ![Admin screenshot placeholder](docs/screenshots/admin.png) | ![Orders screenshot placeholder](docs/screenshots/orders.png) | ![Debug log screenshot placeholder](docs/screenshots/debug-log.png) |
+| ![Admin settings — OTP mode, checkout behavior, trusted-device duration](docs/screenshots/admin.png) | ![Email Verified column on the Orders list](docs/screenshots/orders.png) | ![Built-in debug log showing send/verify activity and failure reasons](docs/screenshots/debug-log.png) |
 
 ## Features
 
@@ -111,6 +109,12 @@ Watch this repo or [get in touch](mailto:support@xanteltech.com) to be notified 
 Version 1.0.1 included a security hardening pass: OTP verification is checked server-side on every flow (registration, login, checkout), with a brute-force-attempt limit on verification. See [CHANGELOG](#changelog) below. If you discover a security issue, please email **support@xanteltech.com** directly rather than opening a public issue.
 
 ## Changelog
+
+**1.2.8.3**
+- Fixed: on themes that wrap the entire login form's contents in their own container (observed on the Nasa theme: a `wrap-all` div kept at `display:none` until the theme's own toggle opens it), the OTP-only fields stayed invisible on Checkout's "Click here to login" box even though 1.2.8.2 was correctly setting their own display to visible — a hidden ancestor hides its descendants regardless of the descendant's own display setting. The OTP-only block is now moved to be a direct child of the login `<form>` itself before anything is shown, so it's never trapped inside a theme's own hidden wrapper.
+
+**1.2.8.2**
+- Fixed: with "Force OTP-only login" enabled, opening the "Click here to login" box on Checkout could show an empty/unmodified login form instead of the OTP-only fields. WooCommerce's checkout login box shares the exact same markup class and hooks as the My Account login page, and the script swapping in the OTP-only fields used a page-wide "first match" lookup instead of checking each login form on the page individually — now every matching login form is handled on its own, and one that doesn't contain our OTP markup is left alone instead of having its fields hidden with nothing shown in their place.
 
 **1.2.8.1**
 - Fixed: pressing Enter in the OTP-only login's email/code fields could trigger WooCommerce's own native form submission (those fields still live inside WooCommerce's shared login form), producing a "Username is required" notice. Enter is now intercepted and routed to the equivalent action.
