@@ -2,8 +2,8 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Surfaces the '_xeo_email_verified' order meta (set by
- * XEO_Checkout::tag_order_verification()) in the WooCommerce admin —
+ * Surfaces the '_xsotp_email_verified' order meta (set by
+ * XSOTP_Checkout::tag_order_verification()) in the WooCommerce admin —
  * as a column on the Orders list and a note on the order screen —
  * regardless of checkout mode. This is the primary UI for "flag" mode,
  * where checkout itself never blocks an unverified order.
@@ -12,10 +12,10 @@ if (!defined('ABSPATH')) exit;
  * hooks, since which one fires depends on the store's WooCommerce
  * order-storage setting.
  */
-class XEO_Order_Column {
+class XSOTP_Order_Column {
 
     public function __construct() {
-        if (!xeo_is_enabled('checkout')) return;
+        if (!xsotp_is_enabled('checkout')) return;
 
         // Legacy, post-based orders
         add_filter('manage_edit-shop_order_columns', [$this, 'add_column']);
@@ -34,34 +34,41 @@ class XEO_Order_Column {
         foreach ($columns as $key => $label) {
             $new[$key] = $label;
             if ($key === 'order_status') {
-                $new['xeo_email_verified'] = __('Email Verified', 'secure-otp-verification-for-woocommerce');
+                $new['xsotp_email_verified'] = __('Email Verified', 'secure-otp-verification-for-woocommerce');
             }
         }
-        if (!isset($new['xeo_email_verified'])) {
-            $new['xeo_email_verified'] = __('Email Verified', 'secure-otp-verification-for-woocommerce');
+        if (!isset($new['xsotp_email_verified'])) {
+            $new['xsotp_email_verified'] = __('Email Verified', 'secure-otp-verification-for-woocommerce');
         }
         return $new;
     }
 
     // $column_or_order_id: legacy passes a post ID, HPOS passes a WC_Order.
     public function render_column($column, $post_id_or_order) {
-        if ($column !== 'xeo_email_verified') return;
+        if ($column !== 'xsotp_email_verified') return;
 
         $order = ($post_id_or_order instanceof WC_Order) ? $post_id_or_order : wc_get_order($post_id_or_order);
         if (!$order) return;
 
-        echo $this->badge($order->get_meta('_xeo_email_verified'));
+        echo wp_kses_post($this->badge($this->verified_meta($order)));
     }
 
     public function render_order_note($order) {
         if (!$order instanceof WC_Order) return;
-        $meta = $order->get_meta('_xeo_email_verified');
+        $meta = $this->verified_meta($order);
         if ($meta === '') return; // checkout OTP wasn't enabled when this order was placed
 
         echo '<p class="form-field">
             <strong>' . esc_html__('Email Verified:', 'secure-otp-verification-for-woocommerce') . '</strong> '
-            . $this->badge($meta) . '
+            . wp_kses_post($this->badge($meta)) . '
         </p>';
+    }
+
+    // Orders placed before the prefix rename (<= 1.2.8.3) carry the old meta key.
+    private function verified_meta($order) {
+        $meta = $order->get_meta('_xsotp_email_verified');
+        if ($meta === '') $meta = $order->get_meta('_xeo_email_verified');
+        return $meta;
     }
 
     private function badge($meta) {

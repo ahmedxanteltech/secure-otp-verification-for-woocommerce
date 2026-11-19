@@ -1,7 +1,9 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-class XEO_Admin {
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- This plugin owns custom tables. Table names are $wpdb->prefix plus a fixed literal (never user input) and every value goes through $wpdb->prepare() or $wpdb->insert/update/delete.
+
+class XSOTP_Admin {
 
     public function __construct() {
         add_action('admin_menu',    [$this, 'add_menu']);
@@ -10,7 +12,19 @@ class XEO_Admin {
         add_action('admin_notices', [$this, 'auto_password_notice']);
         add_action('admin_notices', [$this, 'cache_compatibility_notice']);
         add_action('admin_footer',  [$this, 'print_dismiss_notice_script']);
-        add_action('wp_ajax_xeo_dismiss_notice', [$this, 'ajax_dismiss_notice']);
+        add_action('wp_ajax_xsotp_dismiss_notice', [$this, 'ajax_dismiss_notice']);
+        add_action('admin_init', [$this, 'add_privacy_policy_content']);
+    }
+
+    /**
+     * Adds a suggested paragraph to Settings → Privacy → Policy Guide so
+     * store owners can disclose what this plugin keeps about their customers.
+     */
+    public function add_privacy_policy_content() {
+        if (!function_exists('wp_add_privacy_policy_content')) return;
+        $text = '<h3>' . esc_html__('Secure OTP Verification for WooCommerce', 'secure-otp-verification-for-woocommerce') . '</h3>'
+            . '<p>' . esc_html__('When a visitor requests an email verification code, this plugin stores their email address together with the one-time code (valid for 2 minutes) in this site\'s database, and records whether the email was verified. It also keeps a short activity log (email address, event, timestamp) that is automatically deleted after 7 days. If a customer chooses to remember a device at login, a random token is placed in a cookie on their device and only a hashed copy is stored on this site until it expires. For verified accounts the plugin stores the verification date, and for orders it stores whether the billing email was verified. No data is sent to any third-party service; verification emails are sent through this site\'s own mail configuration.', 'secure-otp-verification-for-woocommerce') . '</p>';
+        wp_add_privacy_policy_content(__('Secure OTP Verification for WooCommerce', 'secure-otp-verification-for-woocommerce'), wp_kses_post(wpautop($text, false)));
     }
 
     public function add_menu() {
@@ -18,12 +32,15 @@ class XEO_Admin {
     }
 
     public function register_settings() {
-        register_setting('xeo_settings', 'xeo_otp_mode');
-        register_setting('xeo_settings', 'xeo_disable_password_login', ['sanitize_callback' => 'absint']);
-        register_setting('xeo_settings', 'xeo_skip_checkout_logged_in', ['sanitize_callback' => 'absint']);
-        register_setting('xeo_settings', 'xeo_trusted_device_days', ['sanitize_callback' => 'absint']);
-        register_setting('xeo_settings', 'xeo_delete_data_on_uninstall', ['sanitize_callback' => 'absint']);
-        register_setting('xeo_settings', 'xeo_checkout_mode', ['sanitize_callback' => function ($v) {
+        register_setting('xsotp_settings', 'xsotp_otp_mode', ['sanitize_callback' => function ($v) {
+            $allowed = ['register_only', 'register_login', 'register_login_checkout'];
+            return in_array($v, $allowed, true) ? $v : 'register_login_checkout';
+        }]);
+        register_setting('xsotp_settings', 'xsotp_disable_password_login', ['sanitize_callback' => 'absint']);
+        register_setting('xsotp_settings', 'xsotp_skip_checkout_logged_in', ['sanitize_callback' => 'absint']);
+        register_setting('xsotp_settings', 'xsotp_trusted_device_days', ['sanitize_callback' => 'absint']);
+        register_setting('xsotp_settings', 'xsotp_delete_data_on_uninstall', ['sanitize_callback' => 'absint']);
+        register_setting('xsotp_settings', 'xsotp_checkout_mode', ['sanitize_callback' => function ($v) {
             return $v === 'flag' ? 'flag' : 'block';
         }]);
     }
@@ -36,18 +53,19 @@ class XEO_Admin {
      * still get it.
      */
     private function notice_dismissed($key) {
-        $dismissed = get_user_meta(get_current_user_id(), 'xeo_dismissed_notices', true);
+        $dismissed = get_user_meta(get_current_user_id(), 'xsotp_dismissed_notices', true);
         return is_array($dismissed) && in_array($key, $dismissed, true);
     }
 
     public function ajax_dismiss_notice() {
-        check_ajax_referer('xeo_dismiss_notice', 'nonce');
-        $notice = isset($_POST['notice']) ? sanitize_key($_POST['notice']) : '';
+        check_ajax_referer('xsotp_dismiss_notice', 'nonce');
+        if (!current_user_can('manage_options')) wp_die('', '', ['response' => 403]);
+        $notice = isset($_POST['notice']) ? sanitize_key(wp_unslash($_POST['notice'])) : '';
         if ($notice) {
-            $dismissed = get_user_meta(get_current_user_id(), 'xeo_dismissed_notices', true);
+            $dismissed = get_user_meta(get_current_user_id(), 'xsotp_dismissed_notices', true);
             if (!is_array($dismissed)) $dismissed = [];
             $dismissed[] = $notice;
-            update_user_meta(get_current_user_id(), 'xeo_dismissed_notices', array_values(array_unique($dismissed)));
+            update_user_meta(get_current_user_id(), 'xsotp_dismissed_notices', array_values(array_unique($dismissed)));
         }
         wp_die();
     }
@@ -60,14 +78,15 @@ class XEO_Admin {
      * actually stays gone for this admin on future page loads too.
      */
     public function print_dismiss_notice_script() {
-        $nonce = wp_create_nonce('xeo_dismiss_notice');
+        if (!current_user_can('manage_options')) return;
+        $nonce = wp_create_nonce('xsotp_dismiss_notice');
         ?>
         <script>
         jQuery(function ($) {
-            $(document).on('click', '.xeo-dismissible-notice .notice-dismiss', function () {
-                var key = $(this).closest('.xeo-dismissible-notice').data('xeo-notice');
+            $(document).on('click', '.xsotp-dismissible-notice .notice-dismiss', function () {
+                var key = $(this).closest('.xsotp-dismissible-notice').data('xsotp-notice');
                 if (!key) return;
-                $.post(ajaxurl, { action: 'xeo_dismiss_notice', notice: key, nonce: '<?php echo esc_js($nonce); ?>' });
+                $.post(ajaxurl, { action: 'xsotp_dismiss_notice', notice: key, nonce: '<?php echo esc_js($nonce); ?>' });
             });
         });
         </script>
@@ -75,9 +94,10 @@ class XEO_Admin {
     }
 
     public function password_disabled_notice() {
-        if (!xeo_password_login_disabled()) return;
+        if (!xsotp_password_login_disabled()) return;
+        if (!current_user_can('manage_options')) return;
         if ($this->notice_dismissed('password_disabled')) return;
-        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="password_disabled"><p>
+        echo '<div class="notice notice-warning is-dismissible xsotp-dismissible-notice" data-xsotp-notice="password_disabled"><p>
             <strong>Secure OTP Verification:</strong> Password-based login is currently <strong>disabled</strong>.
             Users can only log in via Email OTP. &nbsp;
             <a href="' . esc_url(admin_url('options-general.php?page=secure-otp-verification-for-woocommerce')) . '">Change setting</a>
@@ -98,7 +118,7 @@ class XEO_Admin {
         if (get_option('woocommerce_registration_generate_password') !== 'yes') return;
         if (!current_user_can('manage_options')) return;
         if ($this->notice_dismissed('auto_password_lockout')) return;
-        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="auto_password_lockout"><p>
+        echo '<div class="notice notice-warning is-dismissible xsotp-dismissible-notice" data-xsotp-notice="auto_password_lockout"><p>
             <strong>Secure OTP Verification:</strong> WooCommerce is currently set to auto-generate customer passwords
             (sent only by email) instead of letting customers set their own at registration. If that email is ever missed
             or fails to deliver, the customer has no password AND password reset also requires email — a complete lockout
@@ -142,12 +162,12 @@ class XEO_Admin {
             return; // No known caching plugin detected — nothing actionable to warn about.
         }
 
-        echo '<div class="notice notice-warning is-dismissible xeo-dismissible-notice" data-xeo-notice="cache_compat"><p>
+        echo '<div class="notice notice-warning is-dismissible xsotp-dismissible-notice" data-xsotp-notice="cache_compat"><p>
             <strong>Secure OTP Verification:</strong> a page caching plugin is active on this site. OTP login and the
             &ldquo;skip checkout OTP for logged-in customers&rdquo; feature both depend on My Account and checkout being
             rendered fresh for each logged-in visitor — if those pages get served from a shared cache instead, a
             customer can see a stale login form right after successfully verifying, or (in misconfigured setups) one
-            visitor\'s cached page can bleed into another\'s. ' . $tip . '
+            visitor\'s cached page can bleed into another\'s. ' . wp_kses($tip, ['strong' => [], 'code' => []]) . '
         </p></div>';
     }
 
@@ -157,7 +177,7 @@ class XEO_Admin {
         $vtable  = $wpdb->prefix . 'xantel_email_otp_verified_users';
         $ltable  = $wpdb->prefix . 'xantel_email_otp_log';
 
-        if (isset($_POST['xeo_clear_log']) && check_admin_referer('xeo_clear_log')) {
+        if (isset($_POST['xsotp_clear_log']) && check_admin_referer('xsotp_clear_log')) {
             $wpdb->query("TRUNCATE TABLE $ltable");
             echo '<div class="notice notice-success is-dismissible"><p>✅ Log cleared!</p></div>';
         }
@@ -168,12 +188,12 @@ class XEO_Admin {
         $recent         = $wpdb->get_results("SELECT email,purpose,created_at,verified FROM $table ORDER BY id DESC LIMIT 20");
         $log_entries    = $wpdb->get_results("SELECT created_at,level,context,email,message FROM $ltable ORDER BY id DESC LIMIT 50");
 
-        $current_mode      = xeo_get_mode();
-        $password_disabled = xeo_password_login_disabled();
-        $skip_checkout     = xeo_skip_checkout_for_logged_in();
-        $trusted_days      = xeo_trusted_device_days();
-        $delete_on_uninstall = (bool) get_option('xeo_delete_data_on_uninstall', 0);
-        $checkout_mode        = xeo_checkout_mode();
+        $current_mode      = xsotp_get_mode();
+        $password_disabled = xsotp_password_login_disabled();
+        $skip_checkout     = xsotp_skip_checkout_for_logged_in();
+        $trusted_days      = xsotp_trusted_device_days();
+        $delete_on_uninstall = (bool) get_option('xsotp_delete_data_on_uninstall', 0);
+        $checkout_mode        = xsotp_checkout_mode();
 
         $modes = [
             'register_only'           => 'Registration Only',
@@ -185,7 +205,7 @@ class XEO_Admin {
             <!-- Header -->
             <div style="margin-bottom:20px;">
                 <h1 style="margin:0;">Secure OTP Verification for WooCommerce</h1>
-                <p style="margin:2px 0 0;color:#999;font-size:13px;">by <a href="https://xanteltech.com" target="_blank">Xantel Technologies</a> · v<?php echo XEO_VERSION; ?></p>
+                <p style="margin:2px 0 0;color:#999;font-size:13px;">by <a href="https://xanteltech.com" target="_blank" rel="noopener">Xantel Technologies</a> · v<?php echo esc_html(XSOTP_VERSION); ?></p>
             </div>
 
             <?php if (isset($_GET['settings-updated'])): ?>
@@ -200,9 +220,9 @@ class XEO_Admin {
                     ['Spam Blocked',     max(0,$total-$verified_otps),    '#e74c3c'],
                     ['Verified Users',   $verified_users,                 '#8e44ad'],
                 ] as [$label,$val,$color]): ?>
-                <div style="background:#fff;padding:20px;border-radius:8px;border-left:4px solid <?=$color?>;box-shadow:0 2px 5px rgba(0,0,0,.08);">
-                    <p style="margin:0;color:<?=$color?>;font-size:13px;font-weight:600;"><?=esc_html($label)?></p>
-                    <p style="font-size:32px;font-weight:bold;margin:8px 0 0;color:<?=$color?>"><?=$val?></p>
+                <div style="background:#fff;padding:20px;border-radius:8px;border-left:4px solid <?=esc_attr($color)?>;box-shadow:0 2px 5px rgba(0,0,0,.08);">
+                    <p style="margin:0;color:<?=esc_attr($color)?>;font-size:13px;font-weight:600;"><?=esc_html($label)?></p>
+                    <p style="font-size:32px;font-weight:bold;margin:8px 0 0;color:<?=esc_attr($color)?>"><?=esc_html($val)?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -211,12 +231,12 @@ class XEO_Admin {
             <div style="background:#fff;padding:25px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,.08);margin-bottom:25px;">
                 <h2 style="margin-top:0;">⚙️ OTP Configuration</h2>
                 <form method="post" action="options.php">
-                    <?php settings_fields('xeo_settings'); ?>
+                    <?php settings_fields('xsotp_settings'); ?>
                     <table class="form-table">
                         <tr>
-                            <th><label for="xeo_otp_mode">Enable OTP For</label></th>
+                            <th><label for="xsotp_otp_mode">Enable OTP For</label></th>
                             <td>
-                                <select name="xeo_otp_mode" id="xeo_otp_mode" style="min-width:320px;padding:8px;">
+                                <select name="xsotp_otp_mode" id="xsotp_otp_mode" style="min-width:320px;padding:8px;">
                                     <?php foreach ($modes as $val => $label): ?>
                                     <option value="<?=esc_attr($val)?>" <?php selected($current_mode,$val); ?>><?=esc_html($label)?></option>
                                     <?php endforeach; ?>
@@ -225,10 +245,10 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="xeo_disable_password_login">Disable Password Login</label></th>
+                            <th><label for="xsotp_disable_password_login">Disable Password Login</label></th>
                             <td>
                                 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                                    <input type="checkbox" name="xeo_disable_password_login" id="xeo_disable_password_login"
+                                    <input type="checkbox" name="xsotp_disable_password_login" id="xsotp_disable_password_login"
                                         value="1" <?php checked($password_disabled,1); ?> style="width:18px;height:18px;" />
                                     <span style="font-weight:500;">Force OTP-only login (hide password field for all non-admin users)</span>
                                 </label>
@@ -239,9 +259,9 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="xeo_checkout_mode">Checkout OTP Behavior</label></th>
+                            <th><label for="xsotp_checkout_mode">Checkout OTP Behavior</label></th>
                             <td>
-                                <select name="xeo_checkout_mode" id="xeo_checkout_mode" style="min-width:320px;padding:8px;">
+                                <select name="xsotp_checkout_mode" id="xsotp_checkout_mode" style="min-width:320px;padding:8px;">
                                     <option value="block" <?php selected($checkout_mode,'block'); ?>>Require OTP before placing order</option>
                                     <option value="flag" <?php selected($checkout_mode,'flag'); ?>>Flag unverified orders for review (don't block checkout)</option>
                                 </select>
@@ -252,10 +272,10 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="xeo_skip_checkout_logged_in">Skip Checkout OTP for Logged-In Customers</label></th>
+                            <th><label for="xsotp_skip_checkout_logged_in">Skip Checkout OTP for Logged-In Customers</label></th>
                             <td>
                                 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                                    <input type="checkbox" name="xeo_skip_checkout_logged_in" id="xeo_skip_checkout_logged_in"
+                                    <input type="checkbox" name="xsotp_skip_checkout_logged_in" id="xsotp_skip_checkout_logged_in"
                                         value="1" <?php checked($skip_checkout,1); ?> style="width:18px;height:18px;" />
                                     <span style="font-weight:500;">Don't ask for checkout OTP if the customer is already logged in</span>
                                 </label>
@@ -267,9 +287,9 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="xeo_trusted_device_days">Remember Login Devices For</label></th>
+                            <th><label for="xsotp_trusted_device_days">Remember Login Devices For</label></th>
                             <td>
-                                <input type="number" name="xeo_trusted_device_days" id="xeo_trusted_device_days"
+                                <input type="number" name="xsotp_trusted_device_days" id="xsotp_trusted_device_days"
                                     min="1" max="365" value="<?=esc_attr($trusted_days)?>" style="width:80px;padding:6px;" /> days
                                 <p class="description">
                                     After a successful login OTP, this device won't be asked for OTP again for this many days
@@ -278,10 +298,10 @@ class XEO_Admin {
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="xeo_delete_data_on_uninstall">On Plugin Deletion</label></th>
+                            <th><label for="xsotp_delete_data_on_uninstall">On Plugin Deletion</label></th>
                             <td>
                                 <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                                    <input type="checkbox" name="xeo_delete_data_on_uninstall" id="xeo_delete_data_on_uninstall"
+                                    <input type="checkbox" name="xsotp_delete_data_on_uninstall" id="xsotp_delete_data_on_uninstall"
                                         value="1" <?php checked($delete_on_uninstall,1); ?> style="width:18px;height:18px;" />
                                     <span style="font-weight:500;">Delete all plugin data (OTP logs, verified-user records, trusted devices, and these settings) when the plugin is deleted</span>
                                 </label>
@@ -321,8 +341,8 @@ class XEO_Admin {
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                     <h2 style="margin:0;">🛠️ Debug Log <span style="font-weight:normal;font-size:13px;color:#999;">(last 50 events, auto-cleared after 7 days)</span></h2>
                     <form method="post" onsubmit="return confirm('Clear the debug log?');">
-                        <?php wp_nonce_field('xeo_clear_log'); ?>
-                        <button type="submit" name="xeo_clear_log" value="1" class="button">Clear Log</button>
+                        <?php wp_nonce_field('xsotp_clear_log'); ?>
+                        <button type="submit" name="xsotp_clear_log" value="1" class="button">Clear Log</button>
                     </form>
                 </div>
                 <p class="description" style="margin-bottom:15px;">
@@ -341,7 +361,7 @@ class XEO_Admin {
                         ?>
                         <tr>
                             <td><?=esc_html($l->created_at)?></td>
-                            <td><span style="color:<?=$color?>;font-weight:600;text-transform:uppercase;font-size:11px;"><?=esc_html($l->level)?></span></td>
+                            <td><span style="color:<?=esc_attr($color)?>;font-weight:600;text-transform:uppercase;font-size:11px;"><?=esc_html($l->level)?></span></td>
                             <td><span style="background:#ecf0f1;padding:3px 8px;border-radius:4px;font-size:12px;"><?=esc_html(ucfirst($l->context))?></span></td>
                             <td><?=esc_html($l->email)?></td>
                             <td><?=esc_html($l->message)?></td>

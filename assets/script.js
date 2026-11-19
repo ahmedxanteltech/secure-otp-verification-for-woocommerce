@@ -2,26 +2,26 @@ jQuery(function ($) {
     'use strict';
 
     var timers          = {};
-    var passwordDisabled = xeo_ajax.disable_password_login === '1';
+    var passwordDisabled = xsotp_ajax.disable_password_login === '1';
 
     // ── Tab switcher ─────────────────────────────────────────────────────────
-    window.xeoSwitchTab = function (tab) {
+    window.xsotpSwitchTab = function (tab) {
         if (tab === 'password') {
-            style('#xeo-tab-password', { color: '#1a1a2e', borderBottomColor: '#1a1a2e' });
-            style('#xeo-tab-otp',      { color: '#999',    borderBottomColor: 'transparent' });
+            style('#xsotp-tab-password', { color: '#1a1a2e', borderBottomColor: '#1a1a2e' });
+            style('#xsotp-tab-otp',      { color: '#999',    borderBottomColor: 'transparent' });
             $('#username, #password').closest('.woocommerce-form-row').show();
             $('.lost_password, .woocommerce-form__label-for-checkbox').show();
             $('[name="login"][type="submit"]').closest('.form-row').show();
-            $('#xeo-password-login-otp-section, #xeo-login-send-btn-row').show();
-            $('#xeo-otp-only-login').hide();
+            $('#xsotp-password-login-otp-section, #xsotp-login-send-btn-row').show();
+            $('#xsotp-otp-only-login').hide();
         } else {
-            style('#xeo-tab-otp',      { color: '#1a1a2e', borderBottomColor: '#1a1a2e' });
-            style('#xeo-tab-password', { color: '#999',    borderBottomColor: 'transparent' });
+            style('#xsotp-tab-otp',      { color: '#1a1a2e', borderBottomColor: '#1a1a2e' });
+            style('#xsotp-tab-password', { color: '#999',    borderBottomColor: 'transparent' });
             $('#username, #password').closest('.woocommerce-form-row').hide();
             $('.lost_password, .woocommerce-form__label-for-checkbox').hide();
             $('[name="login"][type="submit"]').closest('.form-row').hide();
-            $('#xeo-password-login-otp-section, #xeo-login-send-btn-row').hide();
-            $('#xeo-otp-only-login').show();
+            $('#xsotp-password-login-otp-section, #xsotp-login-send-btn-row').hide();
+            $('#xsotp-otp-only-login').show();
         }
     };
 
@@ -66,7 +66,7 @@ jQuery(function ($) {
     // buttons stay as a manual fallback, but most users won't need them.
     var autoSubmitted = {};
 
-    $(document).on('input', '#xeo_login_otp, #xeo_otp_login_code, #xeo_checkout_otp', function () {
+    $(document).on('input', '#xsotp_login_otp, #xsotp_otp_login_code, #xsotp_checkout_otp', function () {
         var $field = $(this);
         var id     = $field.attr('id');
         var val    = ($field.val() || '').trim();
@@ -75,16 +75,16 @@ jQuery(function ($) {
         if (autoSubmitted[id]) return;
         autoSubmitted[id] = true;
 
-        if (id === 'xeo_checkout_otp') {
-            $('#xeo-checkout-verify-otp').trigger('click');
-        } else if (id === 'xeo_otp_login_code') {
+        if (id === 'xsotp_checkout_otp') {
+            $('#xsotp-checkout-verify-otp').trigger('click');
+        } else if (id === 'xsotp_otp_login_code') {
             // The password-less "Login with OTP" tab is a plain AJAX call
             // (see submitOtpOnlyLogin below), not a form submission at all —
             // this sidesteps every theme-markup/validation/caching issue a
             // real <form> submit and server redirect ran into previously.
             submitOtpOnlyLogin();
         } else {
-            // The password+OTP tab's field (xeo_login_otp) is still a real
+            // The password+OTP tab's field (xsotp_login_otp) is still a real
             // WordPress login form submission, going through the normal
             // 'authenticate' filter — that path hasn't had these issues,
             // so it's left as a native form submit.
@@ -113,38 +113,38 @@ jQuery(function ($) {
     // no server-side redirect chain for a cache layer or theme popup script
     // to interfere with.
     function submitOtpOnlyLogin() {
-        var email = ($('#xeo_otp_login_email').val() || '').trim();
-        var otp   = ($('#xeo_otp_login_code').val() || '').trim();
-        var nonce = $('#xeo_otp_login_ajax_nonce').val();
-        var $btn  = $('#xeo-otp-login-submit-btn');
+        var email = ($('#xsotp_otp_login_email').val() || '').trim();
+        var otp   = ($('#xsotp_otp_login_code').val() || '').trim();
+        var nonce = $('#xsotp_otp_login_ajax_nonce').val();
+        var $btn  = $('#xsotp-otp-login-submit-btn');
 
-        if (!otp || otp.length !== 6) { xeoShowMsg('login', 'Please enter a valid 6-digit OTP.', 'error'); return; }
+        if (!otp || otp.length !== 6) { xsotpShowMsg('login', 'Please enter a valid 6-digit OTP.', 'error'); return; }
 
         $btn.prop('disabled', true).text('Logging in…');
 
         $.ajax({
-            url:  xeo_ajax.ajax_url,
+            url:  xsotp_ajax.ajax_url,
             type: 'POST',
-            data: { action: 'xeo_otp_login', email: email, otp: otp, nonce: nonce },
+            data: { action: 'xsotp_otp_login', email: email, otp: otp, nonce: nonce },
             success: function (res) {
                 if (res.success) {
-                    xeoShowMsg('login', 'Login successful! Redirecting…', 'success');
+                    xsotpShowMsg('login', 'Login successful! Redirecting…', 'success');
                     setTimeout(function () { window.location.href = res.data.redirect; }, 400);
                 } else {
-                    xeoShowMsg('login', res.data.message, 'error');
+                    xsotpShowMsg('login', res.data.message, 'error');
                     $btn.prop('disabled', false).text('Login with OTP');
-                    autoSubmitted['xeo_otp_login_code'] = false;
+                    autoSubmitted['xsotp_otp_login_code'] = false;
                 }
             },
             error: function () {
-                xeoShowMsg('login', 'Something went wrong. Please try again.', 'error');
+                xsotpShowMsg('login', 'Something went wrong. Please try again.', 'error');
                 $btn.prop('disabled', false).text('Login with OTP');
-                autoSubmitted['xeo_otp_login_code'] = false;
+                autoSubmitted['xsotp_otp_login_code'] = false;
             }
         });
     }
 
-    $(document).on('click', '#xeo-otp-login-submit-btn', function (e) {
+    $(document).on('click', '#xsotp-otp-login-submit-btn', function (e) {
         e.preventDefault();
         submitOtpOnlyLogin();
     });
@@ -157,14 +157,14 @@ jQuery(function ($) {
     // produces WooCommerce's own "Username is required" notice. Explicitly
     // stop Enter from reaching that default behavior and route it to the
     // equivalent action instead.
-    $(document).on('keydown', '#xeo_otp_login_email', function (e) {
+    $(document).on('keydown', '#xsotp_otp_login_email', function (e) {
         if (e.which !== 13 && e.keyCode !== 13) return;
         e.preventDefault();
         e.stopPropagation();
-        $('#xeo-otp-only-login .xeo-send-otp-btn').trigger('click');
+        $('#xsotp-otp-only-login .xsotp-send-otp-btn').trigger('click');
     });
 
-    $(document).on('keydown', '#xeo_otp_login_code', function (e) {
+    $(document).on('keydown', '#xsotp_otp_login_code', function (e) {
         if (e.which !== 13 && e.keyCode !== 13) return;
         e.preventDefault();
         e.stopPropagation();
@@ -173,12 +173,12 @@ jQuery(function ($) {
 
     // Allow auto-submit to fire again if the user re-focuses the field
     // after a failed attempt (e.g. wrong code) and retypes.
-    $(document).on('focus', '#xeo_login_otp, #xeo_otp_login_code, #xeo_checkout_otp', function () {
+    $(document).on('focus', '#xsotp_login_otp, #xsotp_otp_login_code, #xsotp_checkout_otp', function () {
         autoSubmitted[$(this).attr('id')] = false;
     });
 
     // ── Send OTP ─────────────────────────────────────────────────────────────
-    $(document).on('click', '.xeo-send-otp-btn', function (e) {
+    $(document).on('click', '.xsotp-send-otp-btn', function (e) {
         e.preventDefault();
         var btn        = $(this);
         var purpose    = btn.data('purpose');
@@ -186,72 +186,72 @@ jQuery(function ($) {
         var $field     = resolveField(btn, btn.data('email-field'));
         var email      = ($field.val() || '').trim();
 
-        if (!email) { xeoShowMsg(purpose, xeo_ajax.messages.enter_email, 'error'); return; }
+        if (!email) { xsotpShowMsg(purpose, xsotp_ajax.messages.enter_email, 'error'); return; }
 
         btn.prop('disabled', true).text('Sending OTP…');
 
         $.ajax({
-            url:  xeo_ajax.ajax_url,
+            url:  xsotp_ajax.ajax_url,
             type: 'POST',
-            data: { action: 'xeo_send_otp', nonce: xeo_ajax.nonce, email: email, purpose: purpose },
+            data: { action: 'xsotp_send_otp', nonce: xsotp_ajax.nonce, email: email, purpose: purpose },
             success: function (res) {
                 if (res.success) {
                     if (showInput) $('#' + showInput).show();
 
-                    if (purpose === 'login' && !$('#xeo-otp-login-form').is(':visible')) {
-                        $('#xeo-password-login-otp-section').show();
-                        $('#xeo-login-send-btn-row').hide();
+                    if (purpose === 'login' && !$('#xsotp-otp-login-form').is(':visible')) {
+                        $('#xsotp-password-login-otp-section').show();
+                        $('#xsotp-login-send-btn-row').hide();
                     }
-                    if (purpose === 'login' && $('#xeo-otp-login-form').is(':visible')) {
-                        $('#xeo-otp-login-otp-row').show();
-                        $('#xeo-otp-login-send-row').hide();
-                        $('#xeo-otp-login-submit-row').show();
+                    if (purpose === 'login' && $('#xsotp-otp-login-form').is(':visible')) {
+                        $('#xsotp-otp-login-otp-row').show();
+                        $('#xsotp-otp-login-send-row').hide();
+                        $('#xsotp-otp-login-submit-row').show();
                     }
                     if (purpose === 'checkout') {
-                        $('#xeo-checkout-send-section').hide();
-                        $('#xeo-checkout-verify-section').show();
+                        $('#xsotp-checkout-send-section').hide();
+                        $('#xsotp-checkout-verify-section').show();
                     }
 
                     startTimer(purpose);
-                    xeoShowMsg(purpose, res.data.message, 'success');
+                    xsotpShowMsg(purpose, res.data.message, 'success');
                     btn.text('Resend OTP').prop('disabled', false);
                 } else {
-                    xeoShowMsg(purpose, res.data.message, 'error');
+                    xsotpShowMsg(purpose, res.data.message, 'error');
                     btn.text('Send OTP to Email').prop('disabled', false);
                 }
             },
             error: function () {
-                xeoShowMsg(purpose, 'Something went wrong. Please try again.', 'error');
+                xsotpShowMsg(purpose, 'Something went wrong. Please try again.', 'error');
                 btn.text('Send OTP to Email').prop('disabled', false);
             }
         });
     });
 
     // ── Checkout inline verify ────────────────────────────────────────────────
-    $(document).on('click', '#xeo-checkout-verify-otp', function (e) {
+    $(document).on('click', '#xsotp-checkout-verify-otp', function (e) {
         e.preventDefault();
         var btn   = $(this);
         var $field = resolveField(btn, btn.data('email-field'));
         var email = ($field.val() || '').trim();
-        var otp   = $('#xeo_checkout_otp').val();
+        var otp   = $('#xsotp_checkout_otp').val();
 
-        if (!otp || otp.length !== 6) { xeoShowMsg('checkout', 'Please enter a valid 6-digit OTP.', 'error'); return; }
+        if (!otp || otp.length !== 6) { xsotpShowMsg('checkout', 'Please enter a valid 6-digit OTP.', 'error'); return; }
 
         btn.prop('disabled', true).text('Verifying…');
 
         $.ajax({
-            url:  xeo_ajax.ajax_url,
+            url:  xsotp_ajax.ajax_url,
             type: 'POST',
-            data: { action: 'xeo_verify_otp', nonce: xeo_ajax.nonce, email: email, otp: otp, purpose: 'checkout' },
+            data: { action: 'xsotp_verify_otp', nonce: xsotp_ajax.nonce, email: email, otp: otp, purpose: 'checkout' },
             success: function (res) {
                 if (res.success) {
-                    $('#xeo_checkout_verified').val('1');
-                    $('#xeo-checkout-verify-section').hide();
-                    $('#xeo-checkout-send-section').hide();
-                    $('#xeo-checkout-verified-msg').show();
+                    $('#xsotp_checkout_verified').val('1');
+                    $('#xsotp-checkout-verify-section').hide();
+                    $('#xsotp-checkout-send-section').hide();
+                    $('#xsotp-checkout-verified-msg').show();
                     stopTimer('checkout');
                 } else {
-                    xeoShowMsg('checkout', res.data.message, 'error');
+                    xsotpShowMsg('checkout', res.data.message, 'error');
                     btn.prop('disabled', false).text('Verify');
                 }
             }
@@ -259,7 +259,7 @@ jQuery(function ($) {
     });
 
     // ── Resend OTP ───────────────────────────────────────────────────────────
-    $(document).on('click', '.xeo-resend-otp', function (e) {
+    $(document).on('click', '.xsotp-resend-otp', function (e) {
         e.preventDefault();
         var link       = $(this);
         var purpose    = link.data('purpose');
@@ -270,12 +270,12 @@ jQuery(function ($) {
         stopTimer(purpose);
 
         $.ajax({
-            url:  xeo_ajax.ajax_url,
+            url:  xsotp_ajax.ajax_url,
             type: 'POST',
-            data: { action: 'xeo_send_otp', nonce: xeo_ajax.nonce, email: email, purpose: purpose },
+            data: { action: 'xsotp_send_otp', nonce: xsotp_ajax.nonce, email: email, purpose: purpose },
             success: function (res) {
-                if (res.success) { startTimer(purpose); xeoShowMsg(purpose, xeo_ajax.messages.otp_resent, 'success'); }
-                else             { xeoShowMsg(purpose, res.data.message, 'error'); link.show(); }
+                if (res.success) { startTimer(purpose); xsotpShowMsg(purpose, xsotp_ajax.messages.otp_resent, 'success'); }
+                else             { xsotpShowMsg(purpose, res.data.message, 'error'); link.show(); }
             }
         });
     });
@@ -283,10 +283,10 @@ jQuery(function ($) {
     // ── Timer ────────────────────────────────────────────────────────────────
     function startTimer(purpose) {
         stopTimer(purpose);
-        var seconds  = parseInt(xeo_ajax.expiry, 10);
-        var isOtpForm = purpose === 'login' && $('#xeo-otp-login-form').is(':visible');
-        var timerId  = isOtpForm ? '#xeo-otp-login-timer'  : '#xeo-' + purpose + '-timer';
-        var resendId = isOtpForm ? '#xeo-otp-login-resend' : '#xeo-' + purpose + '-resend';
+        var seconds  = parseInt(xsotp_ajax.expiry, 10);
+        var isOtpForm = purpose === 'login' && $('#xsotp-otp-login-form').is(':visible');
+        var timerId  = isOtpForm ? '#xsotp-otp-login-timer'  : '#xsotp-' + purpose + '-timer';
+        var resendId = isOtpForm ? '#xsotp-otp-login-resend' : '#xsotp-' + purpose + '-resend';
 
         $(resendId).hide();
         timers[purpose] = setInterval(function () {
@@ -302,20 +302,20 @@ jQuery(function ($) {
     }
 
     // ── Messages ─────────────────────────────────────────────────────────────
-    function xeoShowMsg(purpose, message, type) {
+    function xsotpShowMsg(purpose, message, type) {
         var color = type === 'success' ? '#27ae60' : '#e74c3c';
         var bg    = type === 'success' ? '#eafaf1' : '#fdf2f0';
-        var id    = 'xeo-msg-' + purpose;
+        var id    = 'xsotp-msg-' + purpose;
         var el    = $('#' + id);
 
         if (!el.length) {
             var anchor = purpose === 'checkout'
-                ? '.xeo-checkout-otp-wrapper'
-                : '#xeo-otp-login-send-row, #xeo-' + purpose + '-send-btn-row';
+                ? '.xsotp-checkout-otp-wrapper'
+                : '#xsotp-otp-login-send-row, #xsotp-' + purpose + '-send-btn-row';
             $(anchor).first().before('<div id="' + id + '" style="padding:10px 15px;border-radius:4px;margin:10px 0;font-size:14px;"></div>');
             el = $('#' + id);
         }
-        el.css({ background: bg, color: color, border: '1px solid ' + color }).html(message).show();
+        el.css({ background: bg, color: color, border: '1px solid ' + color }).text(message).show();
         setTimeout(function () { el.fadeOut(400); }, 5000);
     }
 });

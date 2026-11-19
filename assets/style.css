@@ -1,6 +1,6 @@
 /* Xantel Email OTP — Styles */
 
-.xeo-otp-timer {
+.xsotp-otp-timer {
     display: block;
     font-size: 13px;
     color: #e74c3c;
@@ -8,7 +8,7 @@
     font-weight: 500;
 }
 
-.xeo-resend-otp {
+.xsotp-resend-otp {
     font-size: 13px;
     color: #1a1a2e;
     text-decoration: underline;
@@ -18,7 +18,7 @@
 }
 
 /* Send OTP button */
-.xeo-send-otp-btn {
+.xsotp-send-otp-btn {
     background: #1a1a2e !important;
     color: #fff !important;
     border: none !important;
@@ -28,12 +28,12 @@
     font-size: 14px !important;
     transition: background 0.2s !important;
 }
-.xeo-send-otp-btn:hover {
+.xsotp-send-otp-btn:hover {
     background: #2d2d4e !important;
 }
 
 /* Verify button (checkout) */
-#xeo-checkout-verify-otp {
+#xsotp-checkout-verify-otp {
     background: #27ae60 !important;
     color: #fff !important;
     border: none !important;
@@ -41,27 +41,27 @@
     border-radius: 4px !important;
     cursor: pointer !important;
 }
-#xeo-checkout-verify-otp:hover {
+#xsotp-checkout-verify-otp:hover {
     background: #219a52 !important;
 }
 
 /* OTP input */
-#xeo_checkout_otp,
-#xeo_otp_login_code {
+#xsotp_checkout_otp,
+#xsotp_otp_login_code {
     font-size: 20px !important;
     letter-spacing: 8px !important;
     text-align: center !important;
 }
 
 /* Checkout wrapper */
-.xeo-checkout-otp-wrapper {
+.xsotp-checkout-otp-wrapper {
     border: 2px solid #1a1a2e !important;
     border-radius: 8px !important;
     margin-bottom: 20px !important;
 }
 
 /* Verified msg */
-#xeo-checkout-verified-msg {
+#xsotp-checkout-verified-msg {
     font-size: 16px;
     padding: 10px;
     background: #eafaf1;
@@ -70,21 +70,21 @@
 }
 
 /* Login tabs */
-.xeo-login-tabs {
+.xsotp-login-tabs {
     margin-bottom: 20px !important;
 }
 
 /* OTP-only login form */
-#xeo-otp-only-login {
-    animation: xeoFadeIn 0.3s ease;
+#xsotp-otp-only-login {
+    animation: xsotpFadeIn 0.3s ease;
 }
 
-@keyframes xeoFadeIn {
+@keyframes xsotpFadeIn {
     from { opacity: 0; transform: translateY(-8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Users column */
-.column-xeo_email_verified {
+.column-xsotp_email_verified {
     width: 130px !important;
 }

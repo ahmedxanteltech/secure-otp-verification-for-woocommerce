@@ -90,6 +90,15 @@ Not when logging in with a password. After a successful password + OTP login, th
 **Why don't my customers see a password field when registering?**
 This is a WooCommerce setting, not this plugin — check WooCommerce → Settings → Accounts & Privacy → "When creating an account, automatically generate an account password." If that's checked, WooCommerce hides the password field and only ever tells the customer their password by email. Combined with OTP verification, this can create a complete lockout with no fallback: if that one email is missed or fails to deliver, the customer has no password, and password reset is also email-based. We recommend unchecking it so customers set their own password at registration, with OTP as the added verification layer on top. This plugin shows a warning in wp-admin automatically if this setting is on.
 
+**Does OTP also protect `wp-login.php`, XML-RPC, or the REST API?**
+No. Login OTP is enforced on WooCommerce's own login form (My Account and the checkout login box). WordPress's built-in `wp-login.php`, XML-RPC and REST/application-password logins show no OTP field, so they aren't covered when password login is allowed — treat this plugin as email verification and passwordless login for your storefront, not a replacement for two-factor authentication on wp-admin. With "Force OTP-only login" on, password logins through those routes are refused for everyone except administrators. Pair it with a dedicated 2FA/login-security plugin to harden admin access.
+
+**What personal data does the plugin store?**
+Email addresses and one-time codes (valid 2 minutes, cleaned up hourly), a short activity log (deleted after 7 days), the date an account's email was verified, a Yes/No "email verified" marker on orders, and — only if a customer remembers a device — a hashed token. Nothing is sent to third parties. A suggested paragraph is added under Settings → Privacy → Policy Guide.
+
+**After logging in, the home page still shows me as logged out. Why?**
+Some caching or performance plugins (for example WP Rocket's "Preload Links" or similar link-prefetching features) load pages in the background while a visitor is still on the login screen. The browser can then keep showing that older logged-out copy for a short time after login; a hard refresh (Ctrl+Shift+R) shows the correct page. It affects any login method, not only OTP, and the plugin cannot control it. Turn off link preloading/prefetching in your caching plugin, and make sure your page cache is not serving cached pages to logged-in users.
+
 **Does this work with Elementor, Divi, or other page builders?**
 Yes, when the builder is used to style or lay out a page around WooCommerce's own registration, login, or checkout form (its own shortcodes/blocks) — this is the vast majority of page-builder usage, and the plugin's field detection adapts to custom markup automatically. It does not currently integrate with separate custom-form tools that replace WooCommerce's own forms entirely — for example Elementor Pro's own Login widget, Gravity Forms' or WPForms' user-registration add-ons, or membership plugins like Ultimate Member — since these process registration/login through their own systems rather than WooCommerce's. Support for specific tools may be added in future based on demand.
 
@@ -109,6 +118,15 @@ Watch this repo or [get in touch](mailto:support@xanteltech.com) to be notified 
 Version 1.0.1 included a security hardening pass: OTP verification is checked server-side on every flow (registration, login, checkout), with a brute-force-attempt limit on verification. See [CHANGELOG](#changelog) below. If you discover a security issue, please email **support@xanteltech.com** directly rather than opening a public issue.
 
 ## Changelog
+
+**1.2.9**
+- Changed: internal prefix renamed from `xeo_` to the longer, unique `xsotp_` (WordPress.org requires at least four characters). Existing settings carry over automatically on update; customers who use "remember this device" are asked for a login OTP once more, and existing orders keep their Verified/Unverified badge.
+- Changed: the OTP email sent to customers now carries your store's name in its header, body and footer instead of the plugin author's name and link.
+- Fixed: the "max 3 OTP emails per 10 minutes per email address" limit never actually triggered, so an address could be sent unlimited codes. It is now enforced (per email address and purpose) and refused attempts appear in the Debug Log.
+- Security hardening: request values are unslashed before sanitizing; the OTP Mode setting is validated on save; admin notices and the dismiss handler require `manage_options`; settings-page output is escaped; status messages are inserted as plain text, not HTML.
+- Fixed: the hourly cleanup job was scheduled on every page load and never removed — now scheduled on activation (re-checked after updates), cleared on deactivation, and removed on uninstall even when data is kept. Cleanup cutoffs use the same clock as stored timestamps.
+- Fixed: dates use `gmdate()` so another plugin changing PHP's default timezone can't shift them.
+- Added: `Requires at least` / `Requires PHP` / `Requires Plugins` headers, a suggested privacy-policy paragraph, and FAQ entries on what login OTP does and doesn't protect and what data is stored.
 
 **1.2.8.3**
 - Fixed: on themes that wrap the entire login form's contents in their own container (observed on the Nasa theme: a `wrap-all` div kept at `display:none` until the theme's own toggle opens it), the OTP-only fields stayed invisible on Checkout's "Click here to login" box even though 1.2.8.2 was correctly setting their own display to visible — a hidden ancestor hides its descendants regardless of the descendant's own display setting. The OTP-only block is now moved to be a direct child of the login `<form>` itself before anything is shown, so it's never trapped inside a theme's own hidden wrapper.

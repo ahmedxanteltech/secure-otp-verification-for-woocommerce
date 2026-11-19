@@ -1,6 +1,8 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- This plugin owns custom tables. Table names are $wpdb->prefix plus a fixed literal (never user input) and every value goes through $wpdb->prepare() or $wpdb->insert/update/delete.
+
 /**
  * Lets a device skip login OTP after it has already completed one
  * successfully, for an admin-configurable number of days. Scoped to
@@ -10,11 +12,11 @@ if (!defined('ABSPATH')) exit;
  * the database, so a leaked/stolen database row can't be replayed as
  * a cookie. Each successful trusted-device login slides the expiry
  * forward, so an active device stays trusted; an idle one falls back
- * to requiring OTP once it passes xeo_trusted_device_days().
+ * to requiring OTP once it passes xsotp_trusted_device_days().
  */
-class XEO_Trusted_Device {
+class XSOTP_Trusted_Device {
 
-    const COOKIE_NAME = 'xeo_trusted_device';
+    const COOKIE_NAME = 'xsotp_trusted_device';
 
     public static function remember($user_id) {
         global $wpdb;
@@ -23,8 +25,8 @@ class XEO_Trusted_Device {
         $token = bin2hex(random_bytes(32));
         $hash  = hash('sha256', $token);
         $now   = current_time('mysql');
-        $days  = xeo_trusted_device_days();
-        $expires = date('Y-m-d H:i:s', strtotime($now) + $days * DAY_IN_SECONDS);
+        $days  = xsotp_trusted_device_days();
+        $expires = gmdate('Y-m-d H:i:s', strtotime($now) + $days * DAY_IN_SECONDS);
 
         $wpdb->insert($table, [
             'user_id'    => $user_id,
@@ -56,8 +58,8 @@ class XEO_Trusted_Device {
         if (!$row) return false;
 
         // Sliding expiry: an active device stays trusted.
-        $days    = xeo_trusted_device_days();
-        $expires = date('Y-m-d H:i:s', strtotime($now) + $days * DAY_IN_SECONDS);
+        $days    = xsotp_trusted_device_days();
+        $expires = gmdate('Y-m-d H:i:s', strtotime($now) + $days * DAY_IN_SECONDS);
         $wpdb->update($table, ['expires_at' => $expires], ['id' => $row->id]);
         self::set_cookie($token, $days);
 
@@ -84,6 +86,7 @@ class XEO_Trusted_Device {
 
     public static function cleanup() {
         global $wpdb;
-        $wpdb->query("DELETE FROM {$wpdb->prefix}xantel_email_otp_trusted_devices WHERE expires_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
+        $cutoff = gmdate('Y-m-d H:i:s', strtotime(current_time('mysql')) - DAY_IN_SECONDS);
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}xantel_email_otp_trusted_devices WHERE expires_at < %s", $cutoff));
     }
 }
